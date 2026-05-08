@@ -1,0 +1,20 @@
+{
+  "name": "d1-god-roll-evaluator",
+  "version": "1.0.0",
+  "description": "Evaluates your Destiny 1 weapons against god roll definitions and writes tags + notes back to DIM Sync.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "auth":     "node src/auth.js",
+    "start":    "node src/index.js",
+    "apply":    "node src/index.js --apply",
+    "diagnose": "node src/diagnose.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.6.0",
+    "open": "^10.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
