@@ -30,6 +30,7 @@ import {
 import { getDimToken, writeAnnotations } from './dim-api.js';
 import { evaluateWeapon, buildDimAnnotation } from './evaluate.js';
 import { PVP, PVE } from './god-rolls.js';
+import { writeHtmlReport } from './report.js';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -266,10 +267,10 @@ async function main() {
     const evaluation   = evaluateWeapon(name, perks.all);
     const annotation   = buildDimAnnotation(evaluation);
     const tierType     = itemData?.tierType  ?? 0;
-    // damageType comes from the item stub (live data — changes with infusion/elements)
+    const icon         = itemData?.icon       ?? null;
     const damageType   = stub.damageType ?? 0;
 
-    results.push({ instanceId: stub.itemInstanceId, name, itemTypeName, tierType, damageType, perks, evaluation, annotation });
+    results.push({ instanceId: stub.itemInstanceId, name, itemTypeName, tierType, damageType, icon, perks, evaluation, annotation });
   }
 
   log(`Evaluated ${results.length} weapon(s).\n`);
@@ -312,6 +313,43 @@ async function main() {
   const closeRolls = results.filter((r) => r.annotation.tag === 'keep');
   const unknown    = results.filter((r) => r.evaluation.pvp.status === 'unknown' && r.evaluation.pve.status === 'unknown');
   console.log(`\n  ★ God Rolls: ${godRolls.length}   ~ Close: ${closeRolls.length}   ? Not in tables: ${unknown.length}   Total: ${results.length}\n`);
+
+  // ---------------------------------------------------------------------------
+  // HTML report
+  // ---------------------------------------------------------------------------
+
+  // Build flat row objects for the report (one per weapon × mode)
+  const RESULT_RANK = { '★ GOD ROLL': 0, '~ Close': 1, '✗ No': 2, '? —': 3 };
+  const htmlRows = [];
+  for (const r of results) {
+    for (const mode of ['PvP', 'PvE']) {
+      const rollDef   = mode === 'PvP' ? PVP[r.name] : PVE[r.name];
+      const evalResult = mode === 'PvP' ? r.evaluation.pvp : r.evaluation.pve;
+      const gridMap   = mapGodRollToGridColumns(rollDef, r.perks);
+      const w         = (col) => rollDef ? (rollDef[col] ?? []) : null;
+      const result    = modeResult(evalResult.status);
+      htmlRows.push({
+        instanceId: r.instanceId,
+        icon:       r.icon,
+        name:       r.name,
+        type:       r.itemTypeName,
+        rarity:     TIER_NAMES[r.tierType]    ?? `Tier${r.tierType}`,
+        damage:     DAMAGE_NAMES[r.damageType] ?? '—',
+        damageRaw:  r.damageType,
+        mode,
+        col1:       colCell(w('col1'), r.perks, gridMap['col1']),
+        col2:       colCell(w('col2'), r.perks, gridMap['col2']),
+        col3:       colCell(w('col3'), r.perks, gridMap['col3']),
+        col4:       colCell(w('col4'), r.perks, gridMap['col4']),
+        result,
+        resultRank: RESULT_RANK[result] ?? 99,
+      });
+    }
+  }
+
+  const reportPath = path.join(__dirname, '..', 'god-roll-report.html');
+  writeHtmlReport(htmlRows, reportPath);
+  log(`HTML report written to ${reportPath}`);
 
   // ---------------------------------------------------------------------------
   // DIM Sync — only runs when --apply is passed

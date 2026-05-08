@@ -118,6 +118,7 @@ export async function buildManifestData(apiKey) {
         tierType:       def.tierType ?? 0,
         itemTypeName:   def.itemTypeName ?? '',
         talentGridHash: def.talentGridHash ?? null,
+        icon:           def.icon ?? null,
       });
       if (def.tierType === 5 || def.tierType === 6) weaponHashes.add(def.itemHash);
     }
