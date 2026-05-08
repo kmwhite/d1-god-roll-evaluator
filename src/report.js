@@ -373,6 +373,17 @@ function buildHtml(rows) {
     color: var(--border-bright);
     font-style: italic;
   }
+  .result-pill.curated {
+    background: rgba(120,160,120,0.08);
+    border: 1px solid #5a8a6a;
+    color: #8ab898;
+    font-style: italic;
+  }
+  .result-pill.error {
+    background: rgba(180,120,40,0.12);
+    border: 1px solid #b07828;
+    color: #d09840;
+  }
 
   .hidden { display: none !important; }
 
@@ -401,6 +412,10 @@ function buildHtml(rows) {
   <button class="filter-btn active" data-filter="all">All</button>
   <button class="filter-btn" data-filter="god-roll">★ God Rolls</button>
   <button class="filter-btn" data-filter="close">~ Close</button>
+  <button class="filter-btn" data-filter="no">✗ No</button>
+  <button class="filter-btn" data-filter="curated">⚙ Curated</button>
+  <button class="filter-btn" data-filter="unknown">? Unknown</button>
+  <button class="filter-btn" data-filter="error">⚠ Error</button>
   <button class="filter-btn" data-filter="pvp">PvP</button>
   <button class="filter-btn" data-filter="pve">PvE</button>
   <div class="search-wrap">
@@ -442,6 +457,12 @@ function buildHtml(rows) {
 <script>
 const RAW = ${rowsJson};
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function iconError(el) {
+  el.outerHTML = '<div class="weapon-icon-placeholder">⬡</div>';
+}
+
 // ── Rendering helpers ────────────────────────────────────────────────────────
 
 function perkCell(val) {
@@ -466,9 +487,11 @@ function perkCell(val) {
 }
 
 function resultPill(result) {
-  const cls = result.includes('GOD') ? 'god-roll'
-    : result.includes('Close') ? 'close'
-    : result === '? —' ? 'unknown'
+  const cls = result.includes('GOD')     ? 'god-roll'
+    : result.includes('Close')           ? 'close'
+    : result.includes('Curated')         ? 'curated'
+    : result.includes('Error')           ? 'error'
+    : result === '? —'                   ? 'unknown'
     : 'no';
   return '<span class="result-pill ' + cls + '">' + esc(result) + '</span>';
 }
@@ -490,9 +513,13 @@ function getRows() {
 
   // Filter
   if (filterMode === 'god-roll') rows = rows.filter(r => r.result.includes('GOD'));
-  else if (filterMode === 'close') rows = rows.filter(r => r.result.includes('Close'));
-  else if (filterMode === 'pvp') rows = rows.filter(r => r.mode === 'PvP');
-  else if (filterMode === 'pve') rows = rows.filter(r => r.mode === 'PvE');
+  else if (filterMode === 'close')   rows = rows.filter(r => r.result.includes('Close'));
+  else if (filterMode === 'no')      rows = rows.filter(r => r.result === '✗ No');
+  else if (filterMode === 'curated') rows = rows.filter(r => r.result.includes('Curated'));
+  else if (filterMode === 'unknown') rows = rows.filter(r => r.result === '? —');
+  else if (filterMode === 'error')   rows = rows.filter(r => r.result.includes('Error'));
+  else if (filterMode === 'pvp')     rows = rows.filter(r => r.mode === 'PvP');
+  else if (filterMode === 'pve')     rows = rows.filter(r => r.mode === 'PvE');
 
   // Search
   if (searchTerm) {
@@ -525,7 +552,7 @@ function render() {
 
     let icon = null;
     if (r.icon) {
-      icon = '<img class="weapon-icon" src="' + esc(r.icon) + '" alt="" loading="lazy" onerror="this.outerHTML=\\'<div class=weapon-icon-placeholder>⬡</div>\\'">';
+      icon = '<img class="weapon-icon" src="' + esc(r.icon) + '" alt="" loading="lazy" onerror="iconError(this)">';
     } else {
       icon = '<div class="weapon-icon-placeholder">⬡</div>';
     };
@@ -557,7 +584,7 @@ function render() {
 }
 
 // Damage class needs to go into the data too
-const DAMAGE_CLASS = { 1:'kinetic', 2:'arc', 3:'solar', 4:'void' };
+const DAMAGE_CLASS = { 0:'kinetic', 1:'kinetic', 2:'arc', 3:'solar', 4:'void' };
 
 // ── Sort headers ─────────────────────────────────────────────────────────────
 

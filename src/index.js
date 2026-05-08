@@ -68,7 +68,7 @@ if (!existsSync(TOKEN_PATH)) {
 // ---------------------------------------------------------------------------
 
 const TIER_NAMES    = { 5: 'Legendary', 6: 'Exotic', 4: 'Rare', 3: 'Uncommon', 2: 'Common' };
-const DAMAGE_NAMES  = { 1: 'Kinetic', 2: 'Arc', 3: 'Solar', 4: 'Void' };
+const DAMAGE_NAMES  = { 0: 'Kinetic', 1: 'Kinetic', 2: 'Arc', 3: 'Solar', 4: 'Void' };
 
 /**
  * Given a full god roll definition and the perks column map, determine which
@@ -111,22 +111,38 @@ function colCell(want, perks, gridColIndex) {
   const hit = want.find((w) => normAll.includes(w.toLowerCase().trim()));
   if (hit) return `✓ ${hit}`;
 
-  // Miss: show what the weapon actually has in the corresponding grid column
-  const hasPerks = gridColIndex !== null
-    ? (perks.get(gridColIndex) ?? [])
-    : [];
-
   const wantStr = '[' + want.map((w) => `'${w}'`).join(', ') + ']';
-  const hasStr  = hasPerks.length > 0
+
+  // gridColIndex null means none of the wanted perks appear anywhere in this
+  // weapon's talent grid — the god roll definition may be wrong for this weapon.
+  if (gridColIndex === null) {
+    return `⚠ want: ${wantStr}; (not in talent grid)`;
+  }
+
+  const hasPerks = perks.get(gridColIndex) ?? [];
+  const hasStr   = hasPerks.length > 0
     ? '[' + hasPerks.map((p) => `'${p}'`).join(', ') + ']'
     : '(not on weapon)';
   return `✗ want: ${wantStr}; has: ${hasStr}`;
 }
 
 /**
- * Return a result label for one mode's evaluation status.
+ * Returns true if any column cell for this mode contains a definition error (⚠).
  */
-function modeResult(status) {
+function hasDefinitionError(rollDef, perks) {
+  if (!rollDef) return false;
+  const gridMap = mapGodRollToGridColumns(rollDef, perks);
+  return ['col1', 'col2', 'col3', 'col4'].some(
+    (col) => (rollDef[col] ?? []).length > 0 && gridMap[col] === null
+  );
+}
+
+/**
+ * Return a result label for one mode's evaluation status.
+ * If the god roll definition references perks not in the talent grid, label as Error.
+ */
+function modeResult(status, isError) {
+  if (isError)                   return '⚠ Error';
   if (status === 'god_roll')     return '★ GOD ROLL';
   if (status === 'close')        return '~ Close';
   if (status === 'not_god_roll') return '✗ No';
@@ -138,17 +154,28 @@ function modeResult(status) {
  * Returns [pvpRow, pveRow] — each is a string[].
  */
 function formatRows(result) {
-  const { name, itemTypeName, tierType, damageType, perks, evaluation } = result;
+  const { name, itemTypeName, tierType, damageType, isCurated, perks, evaluation } = result;
   const pvpDef = PVP[name];
   const pveDef = PVE[name];
 
   const rarity = TIER_NAMES[tierType]  ?? `Tier${tierType}`;
   const damage = DAMAGE_NAMES[damageType] ?? '—';
 
+  // Curated/exotic weapons have a fixed roll — no column evaluation applies.
+  if (isCurated) {
+    const curatedRow = (mode) => [
+      name, itemTypeName, rarity, damage, mode,
+      '—', '—', '—', '—',
+      '⚙ Curated Roll',
+    ];
+    return [curatedRow('PvP'), curatedRow('PvE')];
+  }
+
   const makeRow = (mode, rollDef, evalResult) => {
     // Map each god roll column to a grid column index for this mode's definition
     const gridMap = mapGodRollToGridColumns(rollDef, perks);
     const w = (colKey) => rollDef ? (rollDef[colKey] ?? []) : null;
+    const isError = hasDefinitionError(rollDef, perks);
 
     return [
       name,
@@ -160,7 +187,7 @@ function formatRows(result) {
       colCell(w('col2'), perks, gridMap['col2']),
       colCell(w('col3'), perks, gridMap['col3']),
       colCell(w('col4'), perks, gridMap['col4']),
-      modeResult(evalResult.status),
+      modeResult(evalResult.status, isError),
     ];
   };
 
@@ -268,9 +295,10 @@ async function main() {
     const annotation   = buildDimAnnotation(evaluation);
     const tierType     = itemData?.tierType  ?? 0;
     const icon         = itemData?.icon       ?? null;
+    const isCurated    = itemData?.isCurated  ?? false;
     const damageType   = stub.damageType ?? 0;
 
-    results.push({ instanceId: stub.itemInstanceId, name, itemTypeName, tierType, damageType, icon, perks, evaluation, annotation });
+    results.push({ instanceId: stub.itemInstanceId, name, itemTypeName, tierType, damageType, icon, isCurated, perks, evaluation, annotation });
   }
 
   log(`Evaluated ${results.length} weapon(s).\n`);
@@ -319,7 +347,7 @@ async function main() {
   // ---------------------------------------------------------------------------
 
   // Build flat row objects for the report (one per weapon × mode)
-  const RESULT_RANK = { '★ GOD ROLL': 0, '~ Close': 1, '✗ No': 2, '? —': 3 };
+  const RESULT_RANK = { '★ GOD ROLL': 0, '~ Close': 1, '✗ No': 2, '⚙ Curated Roll': 3, '⚠ Error': 4, '? —': 5 };
   const htmlRows = [];
   for (const r of results) {
     for (const mode of ['PvP', 'PvE']) {
@@ -327,7 +355,9 @@ async function main() {
       const evalResult = mode === 'PvP' ? r.evaluation.pvp : r.evaluation.pve;
       const gridMap   = mapGodRollToGridColumns(rollDef, r.perks);
       const w         = (col) => rollDef ? (rollDef[col] ?? []) : null;
-      const result    = modeResult(evalResult.status);
+      const isError   = hasDefinitionError(rollDef, r.perks);
+      const result    = modeResult(evalResult.status, isError);
+      const curated   = r.isCurated;
       htmlRows.push({
         instanceId: r.instanceId,
         icon:       r.icon,
@@ -337,12 +367,12 @@ async function main() {
         damage:     DAMAGE_NAMES[r.damageType] ?? '—',
         damageRaw:  r.damageType,
         mode,
-        col1:       colCell(w('col1'), r.perks, gridMap['col1']),
-        col2:       colCell(w('col2'), r.perks, gridMap['col2']),
-        col3:       colCell(w('col3'), r.perks, gridMap['col3']),
-        col4:       colCell(w('col4'), r.perks, gridMap['col4']),
-        result,
-        resultRank: RESULT_RANK[result] ?? 99,
+        col1:       curated ? '—' : colCell(w('col1'), r.perks, gridMap['col1']),
+        col2:       curated ? '—' : colCell(w('col2'), r.perks, gridMap['col2']),
+        col3:       curated ? '—' : colCell(w('col3'), r.perks, gridMap['col3']),
+        col4:       curated ? '—' : colCell(w('col4'), r.perks, gridMap['col4']),
+        result:     curated ? '⚙ Curated Roll' : result,
+        resultRank: curated ? 4 : (RESULT_RANK[result] ?? 99),
       });
     }
   }

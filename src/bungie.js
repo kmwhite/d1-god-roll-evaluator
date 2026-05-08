@@ -113,12 +113,22 @@ export async function buildManifestData(apiKey) {
     for (const row of db.prepare('SELECT json FROM DestinyInventoryItemDefinition').all()) {
       const def = JSON.parse(row.json);
       if (!def.itemHash || !WEAPON_BUCKET_HASHES.has(def.bucketTypeHash)) continue;
+
+      // Determine if this weapon has a curated (fixed) roll.
+      // Random-roll weapons have perk column nodes with many steps (5+).
+      // Curated/exotic weapons have every node at 1 step (sometimes 3 for
+      // the damage-type node). Threshold of >3 steps flags a random perk column.
+      const gridNodes = talentGridMap.get(def.talentGridHash) ?? [];
+      const maxSteps  = gridNodes.reduce((m, n) => Math.max(m, (n.steps ?? []).length), 0);
+      const isCurated = maxSteps <= 3;
+
       itemDataMap.set(def.itemHash, {
         name:           def.itemName ?? 'Unknown',
         tierType:       def.tierType ?? 0,
         itemTypeName:   def.itemTypeName ?? '',
         talentGridHash: def.talentGridHash ?? null,
         icon:           def.icon ?? null,
+        isCurated,
       });
       if (def.tierType === 5 || def.tierType === 6) weaponHashes.add(def.itemHash);
     }
