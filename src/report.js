@@ -439,7 +439,7 @@ function buildHtml(rows) {
     gap: 16px;
     padding: 24px 24px 16px;
     border-bottom: 1px solid var(--border);
-    background: linear-gradient(135deg, rgba(200,146,42,0.06) 0%, transparent 60%);
+    background: var(--surface);
     position: sticky;
     top: 0;
     z-index: 1;
@@ -578,10 +578,14 @@ function buildHtml(rows) {
     transition: all 0.15s;
     cursor: default;
     position: relative;
+    opacity: 0.35;
+    filter: grayscale(60%);
   }
   .perk-option.is-rolled {
     border-color: var(--amber);
     background: var(--amber-glow);
+    opacity: 1;
+    filter: none;
   }
   .perk-option.is-rolled::before {
     content: '';
@@ -590,8 +594,73 @@ function buildHtml(rows) {
     box-shadow: inset 0 0 12px rgba(200,146,42,0.15);
     pointer-events: none;
   }
-  .perk-option:hover { border-color: var(--border-bright); }
-  .perk-option.is-rolled:hover { border-color: var(--amber-bright); }
+  .perk-option:hover { border-color: var(--border-bright); opacity: 0.7; filter: grayscale(20%); }
+  .perk-option.is-rolled:hover { border-color: var(--amber-bright); opacity: 1; filter: none; }
+
+  /* God roll evaluation section */
+  .god-roll-eval {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .god-roll-mode {
+    flex: 1;
+    min-width: 200px;
+    border: 1px solid;
+    padding: 12px 14px;
+  }
+  .god-roll-mode.pvp {
+    border-color: rgba(200,80,80,0.4);
+    background: rgba(200,80,80,0.05);
+  }
+  .god-roll-mode.pve {
+    border-color: rgba(60,120,200,0.4);
+    background: rgba(60,120,200,0.05);
+  }
+  .god-roll-mode-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    font-weight: 700;
+  }
+  .god-roll-mode.pvp .god-roll-mode-title { color: #e06060; }
+  .god-roll-mode.pve .god-roll-mode-title { color: #60a0e0; }
+  .god-roll-result-badge {
+    display: inline-block;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    padding: 2px 8px;
+    margin-bottom: 10px;
+    border: 1px solid;
+  }
+  .god-roll-mode.pvp .god-roll-result-badge.god  { color: #e06060; border-color: #e06060; background: rgba(200,80,80,0.1); }
+  .god-roll-mode.pvp .god-roll-result-badge.close { color: #e08060; border-color: #e08060; background: rgba(200,120,80,0.08); }
+  .god-roll-mode.pvp .god-roll-result-badge.no    { color: rgba(200,80,80,0.4); border-color: rgba(200,80,80,0.2); }
+  .god-roll-mode.pve .god-roll-result-badge.god  { color: #60a0e0; border-color: #60a0e0; background: rgba(60,120,200,0.1); }
+  .god-roll-mode.pve .god-roll-result-badge.close { color: #60c0d0; border-color: #60c0d0; background: rgba(60,180,200,0.08); }
+  .god-roll-mode.pve .god-roll-result-badge.no    { color: rgba(60,120,200,0.4); border-color: rgba(60,120,200,0.2); }
+  .god-roll-col-list { display: flex; flex-direction: column; gap: 4px; }
+  .god-roll-col-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 11px;
+    line-height: 1.3;
+  }
+  .god-roll-col-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    width: 42px;
+  }
+  .god-roll-col-hit   { color: #6dbe8a; font-weight: 600; }
+  .god-roll-col-miss  { color: var(--text-dim); }
+  .god-roll-col-na    { color: var(--border-bright); font-style: italic; }
 
   .perk-icon {
     width: 40px;
@@ -917,6 +986,52 @@ function openModal(instanceId, name, icon, type, rarity, damage, damageRaw, ligh
         html += '<div class="stat-label-row"><span class="stat-name">' + esc(s.name) + '</span><span class="stat-value">' + s.value + '</span></div>';
         html += '<div class="stat-bar-track"><div class="stat-bar-fill ' + cls + '" style="width:' + pct + '%"></div></div>';
         html += '</div>';
+      }
+      html += '</div>';
+    }
+
+    // God roll evaluation section
+    const pvpRow = RAW.find(r => r.instanceId === instanceId && r.mode === 'PvP');
+    const pveRow = RAW.find(r => r.instanceId === instanceId && r.mode === 'PvE');
+
+    if (pvpRow || pveRow) {
+      html += '<div class="modal-section-title">God Roll Evaluation</div>';
+      html += '<div class="god-roll-eval">';
+
+      for (const [modeKey, row] of [['pve', pveRow], ['pvp', pvpRow]]) {
+        if (!row) continue;
+        const label = modeKey === 'pvp' ? 'PvP' : 'PvE';
+        const resultText = row.result ?? '—';
+        const badgeCls = resultText.includes('GOD') ? 'god'
+          : resultText.includes('Close') ? 'close' : 'no';
+
+        html += '<div class="god-roll-mode ' + modeKey + '">';
+        html += '<div class="god-roll-mode-title">' + label + '</div>';
+        html += '<div class="god-roll-result-badge ' + badgeCls + '">' + esc(resultText) + '</div>';
+        html += '<div class="god-roll-col-list">';
+
+        for (const [idx, colVal] of [[1, row.col1],[2, row.col2],[3, row.col3],[4, row.col4]]) {
+          if (!colVal || colVal === '—') continue;
+          const isHit  = colVal.startsWith('✓');
+          const isMiss = colVal.startsWith('✗');
+          const cls    = isHit ? 'god-roll-col-hit' : isMiss ? 'god-roll-col-miss' : 'god-roll-col-na';
+          // Trim to just the perk name / want summary for compactness
+          let display = colVal;
+          if (isHit)  display = colVal.slice(2); // strip "✓ "
+          if (isMiss) {
+            const wantIdx = colVal.indexOf('want: ');
+            const hasIdx  = colVal.indexOf('; has:');
+            display = wantIdx !== -1
+              ? colVal.slice(wantIdx + 6, hasIdx !== -1 ? hasIdx : undefined)
+              : colVal;
+          }
+          html += '<div class="god-roll-col-row">';
+          html += '<span class="god-roll-col-label">Col ' + idx + '</span>';
+          html += '<span class="' + cls + '">' + esc(display) + '</span>';
+          html += '</div>';
+        }
+
+        html += '</div></div>';
       }
       html += '</div>';
     }
