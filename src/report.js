@@ -22,11 +22,13 @@ export function writeHtmlReport(rows, outPath) {
 
 function buildHtml(rows) {
   const rowsJson = JSON.stringify(rows.map(r => ({
-    icon:       r.icon ? `${BUNGIE_ROOT}${r.icon}` : null,
+    instanceId: r.instanceId,
+    icon:       r.icon ?? null,
     name:       r.name,
     type:       r.type,
     rarity:     r.rarity,
     damage:     r.damage,
+    damageRaw:  r.damageRaw,
     mode:       r.mode,
     col1:       r.col1,
     col2:       r.col2,
@@ -34,6 +36,7 @@ function buildHtml(rows) {
     col4:       r.col4,
     result:     r.result,
     resultRank: r.resultRank,
+    modalData:  r.modalData ?? undefined,
   })));
 
   return `<!DOCTYPE html>
@@ -395,6 +398,232 @@ function buildHtml(rows) {
     color: var(--text-dim);
     letter-spacing: 0.08em;
   }
+
+  /* ── Modal ────────────────────────────────────────────────────────────────── */
+
+  .modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.82);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .modal-backdrop.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border-bright);
+    width: 100%;
+    max-width: 900px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 0 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(200,146,42,0.15);
+    position: relative;
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 24px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(200,146,42,0.06) 0%, transparent 60%);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .modal-icon {
+    width: 72px;
+    height: 72px;
+    object-fit: cover;
+    border: 2px solid var(--border-bright);
+    flex-shrink: 0;
+    background: var(--surface2);
+  }
+  .modal-icon-placeholder {
+    width: 72px;
+    height: 72px;
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    display: grid;
+    place-items: center;
+    font-size: 32px;
+    color: var(--border-bright);
+    flex-shrink: 0;
+  }
+
+  .modal-title-group { flex: 1; min-width: 0; }
+  .modal-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-bright);
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+  }
+  .modal-meta {
+    margin-top: 6px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .modal-close {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    line-height: 1;
+  }
+  .modal-close:hover { border-color: var(--amber); color: var(--amber); }
+
+  .modal-body { padding: 24px; }
+
+  /* Stats */
+  .modal-section-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 14px;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px 24px;
+    margin-bottom: 28px;
+  }
+
+  .stat-row { display: flex; flex-direction: column; gap: 4px; }
+  .stat-label-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+  }
+  .stat-name { color: var(--text-dim); text-transform: uppercase; font-family: 'Share Tech Mono', monospace; font-size: 10px; }
+  .stat-value { color: var(--text-bright); font-weight: 700; font-size: 13px; }
+  .stat-bar-track {
+    height: 3px;
+    background: var(--border);
+    position: relative;
+  }
+  .stat-bar-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: var(--amber);
+    transition: width 0.3s;
+  }
+  .stat-bar-fill.high { background: #6dbe8a; }
+  .stat-bar-fill.mid  { background: var(--amber); }
+  .stat-bar-fill.low  { background: #c06060; }
+
+  /* Perk columns */
+  .perk-columns {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+
+  .perk-column {
+    flex: 0 0 auto;
+    width: 140px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .perk-column-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-align: center;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .perk-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 6px;
+    border: 1px solid transparent;
+    background: var(--surface2);
+    transition: all 0.15s;
+    cursor: default;
+    position: relative;
+  }
+  .perk-option.is-rolled {
+    border-color: var(--amber);
+    background: var(--amber-glow);
+  }
+  .perk-option.is-rolled::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    box-shadow: inset 0 0 12px rgba(200,146,42,0.15);
+    pointer-events: none;
+  }
+  .perk-option:hover { border-color: var(--border-bright); }
+  .perk-option.is-rolled:hover { border-color: var(--amber-bright); }
+
+  .perk-icon {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    image-rendering: pixelated;
+  }
+  .perk-icon-placeholder {
+    width: 40px;
+    height: 40px;
+    background: var(--border);
+    border-radius: 50%;
+  }
+  .perk-name {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-align: center;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .perk-option.is-rolled .perk-name { color: var(--amber-bright); }
+
+  .perk-tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface2);
+    border: 1px solid var(--border-bright);
+    padding: 8px 10px;
+    font-size: 11px;
+    color: var(--text);
+    width: 200px;
+    z-index: 200;
+    line-height: 1.4;
+    pointer-events: none;
+  }
+  .perk-option:hover .perk-tooltip { display: block; }
+
 </style>
 </head>
 <body>
@@ -453,6 +682,21 @@ function buildHtml(rows) {
 <footer>
   GOD ROLL DEFINITIONS: TRUEGAMING.BOARDS.NET // GENERATED BY D1-GOD-ROLL-EVALUATOR
 </footer>
+
+<!-- Detail modal -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal" id="modal" role="dialog" aria-modal="true">
+    <div class="modal-header" id="modal-header">
+      <div id="modal-icon-wrap"></div>
+      <div class="modal-title-group">
+        <div class="modal-name" id="modal-name"></div>
+        <div class="modal-meta" id="modal-meta"></div>
+      </div>
+      <button class="modal-close" id="modal-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
 
 <script>
 const RAW = ${rowsJson};
@@ -560,7 +804,7 @@ function render() {
     const rarityClass = r.rarity.toLowerCase();
     const damageClass = DAMAGE_CLASS[r.damageRaw] ?? r.damage.toLowerCase();
 
-    html += '<tr' + (isPairStart ? ' class="pair-start"' : '') + '>';
+    html += '<tr' + (isPairStart ? ' class="pair-start"' : '') + ' style="cursor:pointer" data-instanceid="' + esc(r.instanceId ?? '') + '" data-name="' + esc(r.name) + '" data-icon="' + esc(r.icon ?? '') + '" data-type="' + esc(r.type) + '" data-rarity="' + esc(r.rarity) + '" data-damage="' + esc(r.damage) + '" data-damageraw="' + esc(String(r.damageRaw ?? 0)) + '">';
     html += '<td class="icon-cell">' + icon + '</td>';
     html += '<td class="name-cell">' + esc(r.name) + '</td>';
     html += '<td>' + esc(r.type) + '</td>';
@@ -615,6 +859,125 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 document.getElementById('search').addEventListener('input', e => {
   searchTerm = e.target.value;
   render();
+});
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+// Build a lookup: instanceId → modalData (from PvP rows which carry it)
+const modalDataMap = {};
+for (const r of RAW) {
+  if (r.modalData && r.instanceId) modalDataMap[r.instanceId] = r.modalData;
+}
+
+function openModal(instanceId, name, icon, type, rarity, damage, damageRaw) {
+  const data = modalDataMap[instanceId];
+
+  // Header
+  const iconWrap = document.getElementById('modal-icon-wrap');
+  if (icon) {
+    iconWrap.innerHTML = '<img class="modal-icon" src="' + esc(icon) + '" alt="" onerror="iconError(this)">';
+  } else {
+    iconWrap.innerHTML = '<div class="modal-icon-placeholder">⬡</div>';
+  }
+
+  document.getElementById('modal-name').textContent = name;
+  const meta = document.getElementById('modal-meta');
+  meta.innerHTML =
+    '<span class="badge ' + rarity.toLowerCase() + '">' + esc(rarity) + '</span>' +
+    '<span class="damage-dot ' + (DAMAGE_CLASS[damageRaw] ?? damage.toLowerCase()) + '">' + esc(damage) + '</span>' +
+    '<span style="color:var(--text-dim);font-size:12px">' + esc(type) + '</span>';
+
+  // Body
+  const body = document.getElementById('modal-body');
+  if (!data) {
+    body.innerHTML = '<p style="color:var(--text-dim);font-family:Share Tech Mono,monospace;font-size:12px">No detail data available for this weapon.</p>';
+  } else {
+    let html = '';
+
+    // Stats
+    if (data.stats && data.stats.length > 0) {
+      html += '<div class="modal-section-title">Stats</div>';
+      html += '<div class="stats-grid">';
+      for (const s of data.stats) {
+        const pct = Math.round((s.value / (s.max || 100)) * 100);
+        const cls = pct >= 70 ? 'high' : pct >= 40 ? 'mid' : 'low';
+        html += '<div class="stat-row">';
+        html += '<div class="stat-label-row"><span class="stat-name">' + esc(s.name) + '</span><span class="stat-value">' + s.value + '</span></div>';
+        html += '<div class="stat-bar-track"><div class="stat-bar-fill ' + cls + '" style="width:' + pct + '%"></div></div>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+
+    // Perk columns
+    if (data.columns && data.columns.length > 0) {
+      html += '<div class="modal-section-title">Perks</div>';
+      html += '<div class="perk-columns">';
+
+      // Label columns sequentially — weapon types vary too much for hardcoded names
+      const colsSeen = [];
+      for (const col of data.columns) {
+        if (!colsSeen.includes(col.colIndex)) colsSeen.push(col.colIndex);
+      }
+      colsSeen.sort((a, b) => a - b);
+
+      for (const col of data.columns) {
+        const colPos = colsSeen.indexOf(col.colIndex);
+        const label  = 'Column ' + (colPos + 1);
+        html += '<div class="perk-column">';
+        html += '<div class="perk-column-label">' + esc(label) + '</div>';
+        for (const opt of col.options) {
+          const rolledClass = opt.isRolled ? ' is-rolled' : '';
+          html += '<div class="perk-option' + rolledClass + '">';
+          if (opt.icon) {
+            html += '<img class="perk-icon" src="' + esc(opt.icon) + '" alt="" onerror="iconError(this)">';
+          } else {
+            html += '<div class="perk-icon-placeholder"></div>';
+          }
+          html += '<div class="perk-name">' + esc(opt.name) + '</div>';
+          if (opt.desc) {
+            html += '<div class="perk-tooltip">' + esc(opt.desc) + '</div>';
+          }
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+
+    body.innerHTML = html;
+  }
+
+  document.getElementById('modal-backdrop').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modal-backdrop').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal-backdrop').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
+});
+
+// Make table rows clickable — attach to tbody via delegation
+document.getElementById('tbody').addEventListener('click', (e) => {
+  const row = e.target.closest('tr[data-instanceid]');
+  if (!row) return;
+  openModal(
+    row.dataset.instanceid,
+    row.dataset.name,
+    row.dataset.icon,
+    row.dataset.type,
+    row.dataset.rarity,
+    row.dataset.damage,
+    parseInt(row.dataset.damageraw ?? '0', 10),
+  );
 });
 
 // ── Initial render ────────────────────────────────────────────────────────────

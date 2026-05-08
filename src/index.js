@@ -103,7 +103,7 @@ function mapGodRollToGridColumns(rollDef, perks) {
  *           or '(not on weapon)' if this perk type isn't present at all.
  * N/A:  — (weapon not in god roll table for this mode)
  */
-function colCell(want, perks, gridColIndex) {
+function colCell(want, perks, gridColIndex, allPossible) {
   if (want === null) return '—';
   if (want.length === 0) return '—';
 
@@ -113,28 +113,188 @@ function colCell(want, perks, gridColIndex) {
 
   const wantStr = '[' + want.map((w) => `'${w}'`).join(', ') + ']';
 
-  // gridColIndex null means none of the wanted perks appear anywhere in this
-  // weapon's talent grid — the god roll definition may be wrong for this weapon.
   if (gridColIndex === null) {
-    return `⚠ want: ${wantStr}; (not in talent grid)`;
+    // Wanted perk not found in any rolled column — check if it exists anywhere
+    // in the full talent grid definition to distinguish the two cases.
+    const normPossible = [...(allPossible ?? [])].map(p => p.toLowerCase().trim());
+    const isRollable = want.some(w => normPossible.includes(w.toLowerCase().trim()));
+    const hasStr = isRollable ? '(not rolled)' : '(not rollable on this weapon)';
+    return `✗ want: ${wantStr}; has: ${hasStr}`;
   }
 
   const hasPerks = perks.get(gridColIndex) ?? [];
   const hasStr   = hasPerks.length > 0
     ? '[' + hasPerks.map((p) => `'${p}'`).join(', ') + ']'
-    : '(not on weapon)';
+    : '(not rolled)';
   return `✗ want: ${wantStr}; has: ${hasStr}`;
 }
 
 /**
- * Returns true if any column cell for this mode contains a definition error (⚠).
+ * Build a flat set of ALL perk names available on this weapon type —
+ * every step of every node in the talent grid definition, regardless of
+ * what was rolled on this specific instance.
+ * Used for error detection: a perk is only a definition error if it doesn't
+ * exist anywhere in the talent grid at all.
  */
-function hasDefinitionError(rollDef, perks) {
+function buildAllPossiblePerks(stub, talentGridMap) {
+  const gridHash = stub.talentGridHash;
+  if (!gridHash) return new Set();
+  const gridNodes = talentGridMap.get(gridHash) ?? [];
+  const all = new Set();
+  for (const node of gridNodes) {
+    for (const step of node.steps ?? []) {
+      const name = step.nodeStepName?.trim();
+      if (name && name !== 'undefined') all.add(name);
+    }
+  }
+  return all;
+}
+
+/**
+ * Returns true if any god roll column wants a perk that doesn't exist
+ * anywhere in this weapon type's talent grid definition.
+ * This indicates a mistake in the god roll data, not a bad roll.
+ */
+function hasDefinitionError(rollDef, allPossiblePerks) {
   if (!rollDef) return false;
-  const gridMap = mapGodRollToGridColumns(rollDef, perks);
-  return ['col1', 'col2', 'col3', 'col4'].some(
-    (col) => (rollDef[col] ?? []).length > 0 && gridMap[col] === null
-  );
+  for (const colKey of ['col1', 'col2', 'col3', 'col4']) {
+    const want = rollDef[colKey] ?? [];
+    if (want.length === 0) continue;
+    const normAll = [...allPossiblePerks].map(p => p.toLowerCase().trim());
+    const anyExists = want.some(w => normAll.includes(w.toLowerCase().trim()));
+    if (!anyExists) return true;
+  }
+  return false;
+}
+
+/**
+ * Build the full data payload needed to render the detail modal for one weapon.
+ * Returns stats (from the stub) and perk columns (from the talent grid definition,
+ * annotated with which step this instance rolled and whether it's activated).
+ */
+function buildModalData(stub, itemData, talentGridMap) {
+  const BUNGIE_ROOT = 'https://www.bungie.net';
+  const MISSING_ICON = '/img/misc/missing_icon.png';
+
+  // --- Stats: use the stub's stats array (the 6 player-visible stats) ---
+  // Covers both gun stats and sword-specific stats.
+  const STAT_NAMES = {
+    4284893193: 'Rate of Fire',
+    4043523819: 'Impact',
+    1240592695: 'Range',
+    155624089:  'Stability',
+    4188031367: 'Reload',
+    3871231066: 'Magazine',
+    2715839340: 'Recoil',
+    1345609583: 'Aim Assist',
+    943549884:  'Equip Speed',
+    // Sword stats
+    2837207746: 'Speed',
+    2762071195: 'Efficiency',
+    209426660:  'Defense',
+    925767036:  'Energy',
+    2961396640: 'Charge Rate',
+    2523465841: 'Velocity',
+  };
+
+  const STAT_ORDER = [
+    'Rate of Fire', 'Impact', 'Range', 'Stability', 'Reload', 'Magazine',
+    'Aim Assist', 'Recoil', 'Equip Speed',
+    'Speed', 'Efficiency', 'Defense', 'Energy', 'Charge Rate', 'Velocity',
+  ];
+
+  const stats = Object.values(stub.stats ?? {})
+    .filter(s => STAT_NAMES[s.statHash])
+    .map(s => ({
+      name:  STAT_NAMES[s.statHash],
+      value: s.value,
+      max:   s.maximumValue ?? 100,
+    }))
+    .sort((a, b) => STAT_ORDER.indexOf(a.name) - STAT_ORDER.indexOf(b.name));
+
+  // --- Perk columns: group talent grid nodes by column ---
+  const gridNodes = talentGridMap.get(stub.talentGridHash) ?? [];
+  const stubNodes = stub.nodes ?? [];
+
+  // Group nodes by column, skipping:
+  //   column -1 — hidden/intrinsic nodes (damage type flavour, broken entries)
+  //   column  0 — utility nodes (infuse, upgrade, damage element)
+  const colMap = new Map();
+  for (let i = 0; i < gridNodes.length; i++) {
+    const gn  = gridNodes[i];
+    const sn  = stubNodes[i] ?? {};
+    const col = gn.column ?? -1;
+    if (col <= 0) continue; // skip intrinsic (-1) and utility (0)
+
+    if (!colMap.has(col)) colMap.set(col, []);
+
+    const rolledStepIdx = sn.stepIndex ?? 0;
+    const rolledStep    = (gn.steps ?? [])[rolledStepIdx];
+
+    const steps = (gn.steps ?? []).map((step, si) => ({
+      name:     step.nodeStepName?.trim() ?? '',
+      icon:     (step.icon && step.icon !== MISSING_ICON)
+                  ? `${BUNGIE_ROOT}${step.icon}` : null,
+      isRolled: si === rolledStepIdx,
+      isActive: si === rolledStepIdx && (sn.isActivated ?? false),
+      desc:     step.nodeStepDescription?.trim() ?? '',
+    })).filter(s => s.name && s.name !== 'undefined');
+
+    if (steps.length === 0) continue;
+
+    colMap.get(col).push({
+      nodeIndex:     i,
+      exclusiveWith: gn.exlusiveWithNodes ?? [],
+      rolledName:    rolledStep?.nodeStepName?.trim() ?? '',
+      steps,
+    });
+  }
+
+  // Sort columns numerically, then collapse exclusive node groups into one slot
+  const columns = [];
+  const sortedCols = [...colMap.entries()].sort(([a], [b]) => a - b);
+
+  for (const [colIdx, nodes] of sortedCols) {
+    const slotGroups = [];
+    const assigned   = new Set();
+
+    for (const node of nodes) {
+      if (assigned.has(node.nodeIndex)) continue;
+      const group = [node];
+      assigned.add(node.nodeIndex);
+      for (const peerId of node.exclusiveWith) {
+        const peer = nodes.find(n => n.nodeIndex === peerId);
+        if (peer && !assigned.has(peer.nodeIndex)) {
+          group.push(peer);
+          assigned.add(peer.nodeIndex);
+        }
+      }
+      slotGroups.push(group);
+    }
+
+    for (const group of slotGroups) {
+      // Flatten all steps across competing nodes, deduplicate by name
+      // (e.g. sword upgrade tiers like "The Wolves Remember" x2 → shown once)
+      const seen       = new Set();
+      const allOptions = [];
+      for (const opt of group.flatMap(n => n.steps)) {
+        if (!seen.has(opt.name)) {
+          seen.add(opt.name);
+          allOptions.push(opt);
+        }
+      }
+      if (allOptions.length === 0) continue;
+
+      const rolledOption = allOptions.find(s => s.isRolled) ?? allOptions[0];
+      columns.push({
+        colIndex:   colIdx,
+        options:    allOptions,
+        rolledName: rolledOption?.name ?? '',
+      });
+    }
+  }
+
+  return { stats, columns };
 }
 
 /**
@@ -154,7 +314,7 @@ function modeResult(status, isError) {
  * Returns [pvpRow, pveRow] — each is a string[].
  */
 function formatRows(result) {
-  const { name, itemTypeName, tierType, damageType, isCurated, perks, evaluation } = result;
+  const { name, itemTypeName, tierType, damageType, isCurated, perks, allPossible, evaluation } = result;
   const pvpDef = PVP[name];
   const pveDef = PVE[name];
 
@@ -175,7 +335,7 @@ function formatRows(result) {
     // Map each god roll column to a grid column index for this mode's definition
     const gridMap = mapGodRollToGridColumns(rollDef, perks);
     const w = (colKey) => rollDef ? (rollDef[colKey] ?? []) : null;
-    const isError = hasDefinitionError(rollDef, perks);
+    const isError = hasDefinitionError(rollDef, allPossible);
 
     return [
       name,
@@ -183,10 +343,10 @@ function formatRows(result) {
       rarity,
       damage,
       mode,
-      colCell(w('col1'), perks, gridMap['col1']),
-      colCell(w('col2'), perks, gridMap['col2']),
-      colCell(w('col3'), perks, gridMap['col3']),
-      colCell(w('col4'), perks, gridMap['col4']),
+      colCell(w('col1'), perks, gridMap['col1'], allPossible),
+      colCell(w('col2'), perks, gridMap['col2'], allPossible),
+      colCell(w('col3'), perks, gridMap['col3'], allPossible),
+      colCell(w('col4'), perks, gridMap['col4'], allPossible),
       modeResult(evalResult.status, isError),
     ];
   };
@@ -291,14 +451,16 @@ async function main() {
     const name         = itemData?.name         ?? `Unknown (hash:${stub.itemHash})`;
     const itemTypeName = itemData?.itemTypeName  ?? '';
     const perks        = extractPerkNames(stub, null, talentGridMap);
+    const allPossible  = buildAllPossiblePerks(stub, talentGridMap);
     const evaluation   = evaluateWeapon(name, perks.all);
     const annotation   = buildDimAnnotation(evaluation);
     const tierType     = itemData?.tierType  ?? 0;
     const icon         = itemData?.icon       ?? null;
     const isCurated    = itemData?.isCurated  ?? false;
     const damageType   = stub.damageType ?? 0;
+    const modalData    = buildModalData(stub, itemData, talentGridMap);
 
-    results.push({ instanceId: stub.itemInstanceId, name, itemTypeName, tierType, damageType, icon, isCurated, perks, evaluation, annotation });
+    results.push({ instanceId: stub.itemInstanceId, name, itemTypeName, tierType, damageType, icon, isCurated, perks, allPossible, evaluation, annotation, modalData });
   }
 
   log(`Evaluated ${results.length} weapon(s).\n`);
@@ -355,24 +517,26 @@ async function main() {
       const evalResult = mode === 'PvP' ? r.evaluation.pvp : r.evaluation.pve;
       const gridMap   = mapGodRollToGridColumns(rollDef, r.perks);
       const w         = (col) => rollDef ? (rollDef[col] ?? []) : null;
-      const isError   = hasDefinitionError(rollDef, r.perks);
+      const isError   = hasDefinitionError(rollDef, r.allPossible);
       const result    = modeResult(evalResult.status, isError);
       const curated   = r.isCurated;
       htmlRows.push({
         instanceId: r.instanceId,
-        icon:       r.icon,
+        icon:       r.icon ? `https://www.bungie.net${r.icon}` : null,
         name:       r.name,
         type:       r.itemTypeName,
         rarity:     TIER_NAMES[r.tierType]    ?? `Tier${r.tierType}`,
         damage:     DAMAGE_NAMES[r.damageType] ?? '—',
         damageRaw:  r.damageType,
         mode,
-        col1:       curated ? '—' : colCell(w('col1'), r.perks, gridMap['col1']),
-        col2:       curated ? '—' : colCell(w('col2'), r.perks, gridMap['col2']),
-        col3:       curated ? '—' : colCell(w('col3'), r.perks, gridMap['col3']),
-        col4:       curated ? '—' : colCell(w('col4'), r.perks, gridMap['col4']),
+        col1:       curated ? '—' : colCell(w('col1'), r.perks, gridMap['col1'], r.allPossible),
+        col2:       curated ? '—' : colCell(w('col2'), r.perks, gridMap['col2'], r.allPossible),
+        col3:       curated ? '—' : colCell(w('col3'), r.perks, gridMap['col3'], r.allPossible),
+        col4:       curated ? '—' : colCell(w('col4'), r.perks, gridMap['col4'], r.allPossible),
         result:     curated ? '⚙ Curated Roll' : result,
         resultRank: curated ? 4 : (RESULT_RANK[result] ?? 99),
+        // Modal data only attached once (on PvP row) to avoid doubling JSON size
+        modalData:  mode === 'PvP' ? r.modalData : undefined,
       });
     }
   }
