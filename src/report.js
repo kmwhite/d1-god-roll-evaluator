@@ -29,6 +29,7 @@ function buildHtml(rows) {
     rarity:     r.rarity,
     damage:     r.damage,
     damageRaw:  r.damageRaw,
+    light:      r.light ?? null,
     mode:       r.mode,
     col1:       r.col1,
     col2:       r.col2,
@@ -330,6 +331,14 @@ function buildHtml(rows) {
     color: var(--text-dim);
     padding: 2px 6px;
     border: 1px solid var(--border);
+  }
+
+  .light-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--amber-bright);
+    display: block;
+    text-align: center;
   }
 
   /* Perk cells */
@@ -667,6 +676,7 @@ function buildHtml(rows) {
   <th data-col="type">Type</th>
   <th data-col="rarity">Rarity</th>
   <th data-col="damage">Damage</th>
+  <th data-col="light">Light</th>
   <th data-col="mode">Mode</th>
   <th data-col="col1">Column 1</th>
   <th data-col="col2">Column 2</th>
@@ -804,12 +814,13 @@ function render() {
     const rarityClass = r.rarity.toLowerCase();
     const damageClass = DAMAGE_CLASS[r.damageRaw] ?? r.damage.toLowerCase();
 
-    html += '<tr' + (isPairStart ? ' class="pair-start"' : '') + ' style="cursor:pointer" data-instanceid="' + esc(r.instanceId ?? '') + '" data-name="' + esc(r.name) + '" data-icon="' + esc(r.icon ?? '') + '" data-type="' + esc(r.type) + '" data-rarity="' + esc(r.rarity) + '" data-damage="' + esc(r.damage) + '" data-damageraw="' + esc(String(r.damageRaw ?? 0)) + '">';
+    html += '<tr' + (isPairStart ? ' class="pair-start"' : '') + ' style="cursor:pointer" data-instanceid="' + esc(r.instanceId ?? '') + '" data-name="' + esc(r.name) + '" data-icon="' + esc(r.icon ?? '') + '" data-type="' + esc(r.type) + '" data-rarity="' + esc(r.rarity) + '" data-damage="' + esc(r.damage) + '" data-damageraw="' + esc(String(r.damageRaw ?? 0)) + '" data-light="' + esc(String(r.light ?? '')) + '">';
     html += '<td class="icon-cell">' + icon + '</td>';
     html += '<td class="name-cell">' + esc(r.name) + '</td>';
     html += '<td>' + esc(r.type) + '</td>';
     html += '<td><span class="badge ' + rarityClass + '">' + esc(r.rarity) + '</span></td>';
     html += '<td><span class="damage-dot ' + damageClass + '">' + esc(r.damage) + '</span></td>';
+    html += '<td><span class="light-val">' + (r.light !== null ? r.light : '—') + '</span></td>';
     html += '<td><span class="mode-badge">' + esc(r.mode) + '</span></td>';
     html += '<td class="perk-cell">' + perkCell(r.col1) + '</td>';
     html += '<td class="perk-cell">' + perkCell(r.col2) + '</td>';
@@ -869,7 +880,7 @@ for (const r of RAW) {
   if (r.modalData && r.instanceId) modalDataMap[r.instanceId] = r.modalData;
 }
 
-function openModal(instanceId, name, icon, type, rarity, damage, damageRaw) {
+function openModal(instanceId, name, icon, type, rarity, damage, damageRaw, light) {
   const data = modalDataMap[instanceId];
 
   // Header
@@ -885,6 +896,7 @@ function openModal(instanceId, name, icon, type, rarity, damage, damageRaw) {
   meta.innerHTML =
     '<span class="badge ' + rarity.toLowerCase() + '">' + esc(rarity) + '</span>' +
     '<span class="damage-dot ' + (DAMAGE_CLASS[damageRaw] ?? damage.toLowerCase()) + '">' + esc(damage) + '</span>' +
+    (light !== null ? '<span class="light-val">⬡ ' + light + '</span>' : '') +
     '<span style="color:var(--text-dim);font-size:12px">' + esc(type) + '</span>';
 
   // Body
@@ -977,6 +989,7 @@ document.getElementById('tbody').addEventListener('click', (e) => {
     row.dataset.rarity,
     row.dataset.damage,
     parseInt(row.dataset.damageraw ?? '0', 10),
+    row.dataset.light ? parseInt(row.dataset.light, 10) : null,
   );
 });
 

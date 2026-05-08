@@ -314,17 +314,18 @@ function modeResult(status, isError) {
  * Returns [pvpRow, pveRow] — each is a string[].
  */
 function formatRows(result) {
-  const { name, itemTypeName, tierType, damageType, isCurated, perks, allPossible, evaluation } = result;
+  const { name, itemTypeName, tierType, damageType, isCurated, light, perks, allPossible, evaluation } = result;
   const pvpDef = PVP[name];
   const pveDef = PVE[name];
 
-  const rarity = TIER_NAMES[tierType]  ?? `Tier${tierType}`;
-  const damage = DAMAGE_NAMES[damageType] ?? '—';
+  const rarity  = TIER_NAMES[tierType]    ?? `Tier${tierType}`;
+  const damage  = DAMAGE_NAMES[damageType] ?? '—';
+  const lightStr = light !== null ? String(light) : '—';
 
   // Curated/exotic weapons have a fixed roll — no column evaluation applies.
   if (isCurated) {
     const curatedRow = (mode) => [
-      name, itemTypeName, rarity, damage, mode,
+      name, itemTypeName, rarity, damage, lightStr, mode,
       '—', '—', '—', '—',
       '⚙ Curated Roll',
     ];
@@ -332,7 +333,6 @@ function formatRows(result) {
   }
 
   const makeRow = (mode, rollDef, evalResult) => {
-    // Map each god roll column to a grid column index for this mode's definition
     const gridMap = mapGodRollToGridColumns(rollDef, perks);
     const w = (colKey) => rollDef ? (rollDef[colKey] ?? []) : null;
     const isError = hasDefinitionError(rollDef, allPossible);
@@ -342,6 +342,7 @@ function formatRows(result) {
       itemTypeName,
       rarity,
       damage,
+      lightStr,
       mode,
       colCell(w('col1'), perks, gridMap['col1'], allPossible),
       colCell(w('col2'), perks, gridMap['col2'], allPossible),
@@ -460,7 +461,11 @@ async function main() {
     const damageType   = stub.damageType ?? 0;
     const modalData    = buildModalData(stub, itemData, talentGridMap);
 
-    results.push({ instanceId: stub.itemInstanceId, name, itemTypeName, tierType, damageType, icon, isCurated, perks, allPossible, evaluation, annotation, modalData });
+    // Light (power level) is in stub.primaryStat, not the stats array
+    // The stats array only contains the 6 weapon performance stats
+    const light = stub.primaryStat?.value ?? stub.itemLevel ?? null;
+
+    results.push({ instanceId: stub.itemInstanceId, name, itemTypeName, tierType, damageType, icon, isCurated, light, perks, allPossible, evaluation, annotation, modalData });
   }
 
   log(`Evaluated ${results.length} weapon(s).\n`);
@@ -491,11 +496,11 @@ async function main() {
     tableRows.push(pvpRow, pveRow);
     // Blank separator between weapons (not after the last one)
     if (i < results.length - 1) {
-      tableRows.push(new Array(10).fill(''));
+      tableRows.push(new Array(11).fill(''));
     }
   }
 
-  const headers = ['Weapon', 'Type', 'Rarity', 'Damage', 'Mode', 'Column 1', 'Column 2', 'Column 3', 'Column 4', 'Result'];
+  const headers = ['Weapon', 'Type', 'Rarity', 'Damage', 'Light', 'Mode', 'Column 1', 'Column 2', 'Column 3', 'Column 4', 'Result'];
   renderTable(headers, tableRows);
 
   // Summary counts
@@ -528,6 +533,7 @@ async function main() {
         rarity:     TIER_NAMES[r.tierType]    ?? `Tier${r.tierType}`,
         damage:     DAMAGE_NAMES[r.damageType] ?? '—',
         damageRaw:  r.damageType,
+        light:      r.light ?? null,
         mode,
         col1:       curated ? '—' : colCell(w('col1'), r.perks, gridMap['col1'], r.allPossible),
         col2:       curated ? '—' : colCell(w('col2'), r.perks, gridMap['col2'], r.allPossible),
