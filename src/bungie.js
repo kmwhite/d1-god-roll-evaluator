@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { inflateRawSync } from 'zlib';
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 
 const __dirname      = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR      = path.join(__dirname, '..', '.cache');
@@ -109,7 +109,7 @@ export async function buildManifestData(apiKey) {
 
   console.log('[bungie] Parsing manifest SQLite into memory...');
 
-  const db            = new Database(MANIFEST_DB, { readonly: true, fileMustExist: true });
+  const db            = new DatabaseSync(MANIFEST_DB, { readOnly: true });
   const weaponHashes  = new Set(); // legendary+exotic weapon itemHashes
   const itemDataMap   = new Map(); // itemHash → { name, tierType, itemTypeName, talentGridHash }
   const talentGridMap = new Map(); // gridHash → nodes[]
