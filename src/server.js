@@ -258,12 +258,16 @@ async function runEvaluation(bungieToken, bungieNetMembershipId) {
     const light        = stub.primaryStat?.value ?? stub.itemLevel ?? null;
     const modalData    = buildModalData(stub, itemData, talentGridMap);
 
+    const SLOT_NAMES = { 1498876634: 'Primary', 2465295065: 'Special', 953998645: 'Heavy' };
+    const slot         = SLOT_NAMES[stub.bucketHash] ?? 'Unknown';
+
     results.push({
       instanceId:     stub.itemInstanceId,
       itemHash:       stub.itemHash,
       characterId:    stub.characterId ?? null,
       transferStatus: stub.transferStatus ?? 0,
       location:       stub.location ?? 1,
+      slot,
       name, itemTypeName, tierType, damageType, icon, isCurated, light,
       byColumn, all, allPossible, evaluation, modalData,
     });
@@ -296,6 +300,7 @@ async function runEvaluation(bungieToken, bungieNetMembershipId) {
         icon:       r.icon ? `https://www.bungie.net${r.icon}` : null,
         name:       r.name,
         type:       r.itemTypeName,
+        slot:       r.slot,
         rarity:     TIER_NAMES[r.tierType]    ?? `Tier${r.tierType}`,
         damage:     DAMAGE_NAMES[r.damageType] ?? '—',
         damageRaw:  r.damageType,

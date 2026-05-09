@@ -158,21 +158,22 @@
   }
   .controls-row {
     padding: 8px 40px;
-    display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 0;
+    align-items: center;
   }
-  .controls-row + .controls-row {
-    border-top: 1px solid var(--border);
-    background: rgba(0,0,0,0.15);
-  }
-  .controls-divider {
-    width: 1px; height: 16px;
-    background: var(--border-bright);
-    margin: 0 8px; flex-shrink: 0;
-  }
-  /* Each labelled group wraps as a unit — never breaks mid-group */
+  /* Each filter set is one non-wrapping flex item with a left border as divider */
   .filter-group {
-    display: flex; gap: 6px; align-items: center; flex-wrap: nowrap;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+    padding: 4px 12px 4px 12px;
+    border-left: 1px solid var(--border-bright);
   }
+  .filter-group:first-child { border-left: none; padding-left: 0; }
   .filter-label {
     font-size: 10px; letter-spacing: 0.12em;
     text-transform: uppercase; color: var(--text-dim);
@@ -207,6 +208,42 @@
   .mode-filter-btn.active               { background: rgba(60,120,200,0.1); border-color: #4a7c9e; color: #7ab0d0; }
   .mode-filter-btn.active[data-mode="pvp"] { background: rgba(200,80,80,0.08); border-color: rgba(200,80,80,0.5); color: #e06060; }
   .mode-filter-btn.active[data-mode="pve"] { background: rgba(60,120,200,0.08); border-color: rgba(60,120,200,0.5); color: #60a0e0; }
+
+  /* Dynamic filter buttons — share base style with filter-btn */
+  .dyn-filter-btn {
+    padding: 3px 10px; background: var(--surface2);
+    border: 1px solid var(--border); color: var(--text-dim);
+    font-family: 'Rajdhani', sans-serif; font-size: 12px;
+    font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; cursor: pointer; transition: all 0.15s;
+  }
+  .dyn-filter-btn:hover { border-color: var(--border-bright); color: var(--text); }
+  .dyn-filter-btn.active { background: var(--amber-glow); border-color: var(--amber); color: var(--amber-bright); }
+
+  /* Rarity-coloured active states */
+  .dyn-filter-btn.active[data-rarity="Exotic"]    { background: rgba(200,146,42,0.15); border-color: var(--exotic);    color: var(--exotic); }
+  .dyn-filter-btn.active[data-rarity="Legendary"] { background: rgba(123,94,167,0.15); border-color: var(--legendary); color: var(--legendary); }
+  .dyn-filter-btn.active[data-rarity="Rare"]      { background: rgba(74,124,167,0.15); border-color: var(--rare);      color: var(--rare); }
+  .dyn-filter-btn.active[data-rarity="Uncommon"]  { background: rgba(74,154,90,0.15);  border-color: #4a9a5a;          color: #4a9a5a; }
+  .dyn-filter-btn.active[data-rarity="Common"]    { background: rgba(122,138,138,0.15);border-color: #7a8a8a;          color: #7a8a8a; }
+
+  /* Rarity default (inactive) border hints */
+  .dyn-filter-btn[data-rarity="Exotic"]    { border-color: rgba(200,146,42,0.3);  color: rgba(200,146,42,0.7);  }
+  .dyn-filter-btn[data-rarity="Legendary"] { border-color: rgba(123,94,167,0.3);  color: rgba(123,94,167,0.9);  }
+  .dyn-filter-btn[data-rarity="Rare"]      { border-color: rgba(74,124,167,0.3);  color: rgba(74,124,167,0.9);  }
+  .dyn-filter-btn[data-rarity="Uncommon"]  { border-color: rgba(74,154,90,0.3);   color: rgba(74,154,90,0.9);   }
+  .dyn-filter-btn[data-rarity="Common"]    { border-color: rgba(122,138,138,0.3); color: rgba(122,138,138,0.9); }
+
+  /* Damage dot in filter buttons */
+  .dyn-filter-btn .dmg-dot {
+    display: inline-block; width: 7px; height: 7px;
+    border-radius: 50%; vertical-align: middle;
+    margin-right: 4px; margin-bottom: 1px;
+  }
+  .dmg-dot.kinetic { background: var(--kinetic); }
+  .dmg-dot.arc     { background: var(--arc);     box-shadow: 0 0 4px var(--arc); }
+  .dmg-dot.solar   { background: var(--solar);   box-shadow: 0 0 4px var(--solar); }
+  .dmg-dot.void    { background: var(--void);    box-shadow: 0 0 4px var(--void); }
   .search-wrap { margin-left: auto; position: relative; }
   .search-wrap::before {
     content: '⌕'; position: absolute; left: 10px; top: 50%;
@@ -496,7 +533,7 @@
 <!-- App -->
 <div id="app">
   <div class="controls">
-    <div class="controls-row">
+    <div class="controls-row" id="controls-row">
       <div class="filter-group">
         <span class="filter-label">Result:</span>
         <button class="filter-btn active" data-filter="all">All</button>
@@ -507,14 +544,12 @@
         <button class="filter-btn" data-filter="unknown">? Unknown</button>
         <button class="filter-btn" data-filter="error">⚠ Error</button>
       </div>
-      <span class="controls-divider"></span>
       <div class="filter-group">
         <span class="filter-label">Mode:</span>
         <button class="mode-filter-btn active" data-mode="all">Both</button>
         <button class="mode-filter-btn" data-mode="pve">PvE</button>
         <button class="mode-filter-btn" data-mode="pvp">PvP</button>
       </div>
-      <span class="controls-divider"></span>
       <div class="filter-group">
         <span class="filter-label">Tag:</span>
         <button class="tag-filter-btn active" data-tag="all">All</button>
@@ -527,7 +562,47 @@
         <button class="tag-filter-btn" data-tag="junk">🗑️ Junk</button>
         <button class="tag-filter-btn" data-tag="archive">📦 Archive</button>
       </div>
+      <div class="filter-group">
+        <span class="filter-label">Slot:</span>
+        <button class="dyn-filter-btn active" data-dyn="slot" data-val="all">All</button>
+        <button class="dyn-filter-btn" data-dyn="slot" data-val="Primary">Primary</button>
+        <button class="dyn-filter-btn" data-dyn="slot" data-val="Special">Special</button>
+        <button class="dyn-filter-btn" data-dyn="slot" data-val="Heavy">Heavy</button>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Type:</span>
+        <button class="dyn-filter-btn active" data-dyn="type" data-val="all">All</button>
+        <button class="dyn-filter-btn" data-dyn="type" data-val="Auto Rifle">Auto Rifle</button>
+        <button class="dyn-filter-btn" data-dyn="type" data-val="Hand Cannon">Hand Cannon</button>
+        <button class="dyn-filter-btn" data-dyn="type" data-val="Pulse Rifle">Pulse Rifle</button>
+        <button class="dyn-filter-btn" data-dyn="type" data-val="Scout Rifle">Scout Rifle</button>
+        <button class="dyn-filter-btn" data-dyn="type" data-val="Sidearm">Sidearm</button>
+        <button class="dyn-filter-btn" data-dyn="type" data-val="Fusion Rifle">Fusion Rifle</button>
+        <button class="dyn-filter-btn" data-dyn="type" data-val="Shotgun">Shotgun</button>
+        <button class="dyn-filter-btn" data-dyn="type" data-val="Sniper Rifle">Sniper Rifle</button>
+        <button class="dyn-filter-btn" data-dyn="type" data-val="Machine Gun">Machine Gun</button>
+        <button class="dyn-filter-btn" data-dyn="type" data-val="Rocket Launcher">Rocket Launcher</button>
+        <button class="dyn-filter-btn" data-dyn="type" data-val="Sword">Sword</button>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Rarity:</span>
+        <button class="dyn-filter-btn active" data-dyn="rarity" data-val="all">All</button>
+        <button class="dyn-filter-btn" data-dyn="rarity" data-val="Exotic" data-rarity="Exotic">Exotic</button>
+        <button class="dyn-filter-btn" data-dyn="rarity" data-val="Legendary" data-rarity="Legendary">Legendary</button>
+        <button class="dyn-filter-btn" data-dyn="rarity" data-val="Rare" data-rarity="Rare">Rare</button>
+        <button class="dyn-filter-btn" data-dyn="rarity" data-val="Uncommon" data-rarity="Uncommon">Uncommon</button>
+        <button class="dyn-filter-btn" data-dyn="rarity" data-val="Common" data-rarity="Common">Common</button>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Damage:</span>
+        <button class="dyn-filter-btn active" data-dyn="damage" data-val="all">All</button>
+        <button class="dyn-filter-btn" data-dyn="damage" data-val="Kinetic"><span class="dmg-dot kinetic"></span>Kinetic</button>
+        <button class="dyn-filter-btn" data-dyn="damage" data-val="Solar"><span class="dmg-dot solar"></span>Solar</button>
+        <button class="dyn-filter-btn" data-dyn="damage" data-val="Arc"><span class="dmg-dot arc"></span>Arc</button>
+        <button class="dyn-filter-btn" data-dyn="damage" data-val="Void"><span class="dmg-dot void"></span>Void</button>
+      </div>
     </div>
+  </div>
   </div>
 
   <div class="stats-bar">
@@ -588,10 +663,14 @@ let characters = [];
 let characterIds = [];
 let platformMembershipId = null;
 let sortCol = 'result', sortDir = 1;
-let filterMode = 'all';
-let tagFilter  = 'all';
-let modeFilter = 'all';
-let searchTerm = '';
+let filterMode   = 'all';
+let tagFilter    = 'all';
+let modeFilter   = 'all';
+let slotFilter   = 'all'; // Primary / Special / Heavy
+let typeFilter   = 'all'; // Sidearm, Rocket Launcher, etc.
+let rarityFilter = 'all';
+let damageFilter = 'all';
+let searchTerm   = '';
 const DAMAGE_CLASS = { 0:'kinetic', 1:'kinetic', 2:'arc', 3:'solar', 4:'void' };
 
 // ── Tag system ────────────────────────────────────────────────────────────────
@@ -718,6 +797,8 @@ async function loadInventory() {
 document.getElementById('btn-refresh').addEventListener('click', () => {
   RAW = [];
   Object.keys(modalDataMap).forEach(k => delete modalDataMap[k]);
+  Object.keys(transferMeta).forEach(k => delete transferMeta[k]);
+  slotFilter = typeFilter = rarityFilter = damageFilter = 'all';
   loadInventory();
 });
 
@@ -753,7 +834,21 @@ function resultPill(result) {
   return '<span class="result-pill ' + cls + '">' + esc(result) + '</span>';
 }
 
-// ── Table ─────────────────────────────────────────────────────────────────────
+// ── Dynamic filter buttons (static in HTML, wired here) ───────────────────────
+
+document.querySelectorAll('.dyn-filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const group = btn.dataset.dyn;
+    document.querySelectorAll(`.dyn-filter-btn[data-dyn="${group}"]`).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const val = btn.dataset.val;
+    if (group === 'slot')   slotFilter   = val;
+    if (group === 'type')   typeFilter   = val;
+    if (group === 'rarity') rarityFilter = val;
+    if (group === 'damage') damageFilter = val;
+    render();
+  });
+});
 function getRows() {
   let rows = [...RAW];
 
@@ -770,6 +865,12 @@ function getRows() {
   // Mode filter
   if (modeFilter === 'pvp') rows = rows.filter(r => r.mode === 'PvP');
   else if (modeFilter === 'pve') rows = rows.filter(r => r.mode === 'PvE');
+
+  // Slot / type / rarity / damage filters (match on any row in the pair)
+  if (slotFilter   !== 'all') rows = rows.filter(r => r.slot   === slotFilter);
+  if (typeFilter   !== 'all') rows = rows.filter(r => r.type   === typeFilter);
+  if (rarityFilter !== 'all') rows = rows.filter(r => r.rarity === rarityFilter);
+  if (damageFilter !== 'all') rows = rows.filter(r => r.damage === damageFilter);
 
   // Tag filter — applied independently (AND with result filter)
   if (tagFilter !== 'all') {
