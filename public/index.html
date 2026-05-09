@@ -328,7 +328,59 @@
   .tag-option.active { color: var(--amber-bright); }
   .tag-option.clear  { color: #8a3a3a; border-top: 1px solid var(--border); }
 
-  /* Tag button group in modal */
+  /* Manage Location box */
+  .manage-location-box {
+    border: 1px solid var(--border-bright);
+    background: var(--surface2);
+    padding: 14px 16px;
+    margin-bottom: 24px;
+  }
+  .manage-location-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--amber);
+    margin-bottom: 14px;
+  }
+  .manage-location-section { margin-bottom: 12px; }
+  .manage-location-section:last-child { margin-bottom: 0; }
+  .manage-location-section-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--text-dim);
+    margin-bottom: 7px;
+  }
+  .transfer-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 24px; }
+  .transfer-btn {
+    padding: 5px 14px; font-family: 'Share Tech Mono', monospace;
+    font-size: 11px; letter-spacing: 0.06em;
+    border: 1px solid var(--border); color: var(--text-dim);
+    background: var(--surface2); cursor: pointer; transition: all 0.15s;
+  }
+  .transfer-btn:hover:not(:disabled) { border-color: var(--border-bright); color: var(--text); }
+  .transfer-btn:disabled { opacity: 0.4; cursor: default; }
+  .transfer-btn.current { border-color: var(--amber); color: var(--amber-bright); background: var(--amber-glow); opacity: 1; }
+  .transfer-btn-emblem {
+    min-width: 160px; height: 36px;
+    position: relative; overflow: hidden;
+    border-color: var(--border-bright);
+  }
+  .transfer-btn-emblem:hover:not(:disabled) { border-color: var(--text); }
+  .transfer-btn-emblem.current { border-color: var(--amber); }
+  /* Dark overlay so text is always legible over the emblem image */
+  .transfer-btn-emblem::before {
+    content: ''; position: absolute; inset: 0;
+    background: rgba(0,0,0,0.55);
+    transition: background 0.15s;
+  }
+  .transfer-btn-emblem:hover:not(:disabled)::before { background: rgba(0,0,0,0.35); }
+  .transfer-btn-emblem.current::before { background: rgba(200,146,42,0.3); }
+  .transfer-btn-label {
+    position: relative; z-index: 1;
+    font-weight: 700; font-size: 11px;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    letter-spacing: 0.06em;
+  }
+  .transfer-disabled { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--text-dim); font-style: italic; }
   .tag-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 24px; }
   .tag-btn {
     padding: 5px 12px; font-family: 'Share Tech Mono', monospace;
@@ -523,6 +575,7 @@
     </div>
     <div class="modal-body">
       <div id="modal-tag-section"></div>
+      <div id="modal-transfer-section"></div>
       <div id="modal-content"></div>
     </div>
   </div>
@@ -531,6 +584,9 @@
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
 let RAW = [];
+let characters = [];
+let characterIds = [];
+let platformMembershipId = null;
 let sortCol = 'result', sortDir = 1;
 let filterMode = 'all';
 let tagFilter  = 'all';
@@ -631,9 +687,23 @@ async function loadInventory() {
     // JS context — avoids Firefox XrayWrapper cross-origin object errors
     const data = JSON.parse(JSON.stringify(raw));
     RAW = data.rows;
+    characters = data.characters ?? [];
+    characterIds = data.characterIds ?? [];
+    platformMembershipId = data.platformMembershipId ?? null;
     // Build modal data map
     for (const r of RAW) {
-      if (r.modalData && r.instanceId) modalDataMap[r.instanceId] = r.modalData;
+      if (r.instanceId) {
+        if (r.modalData) modalDataMap[r.instanceId] = r.modalData;
+        // Store transfer metadata keyed by instanceId
+        if (r.itemHash !== undefined) {
+          transferMeta[r.instanceId] = {
+            itemHash:       r.itemHash,
+            characterId:    r.characterId,
+            transferStatus: r.transferStatus,
+            location:       r.location,
+          };
+        }
+      }
     }
     show('app');
     document.querySelector('th[data-col="result"]').classList.add('sort-asc');
@@ -902,6 +972,207 @@ document.addEventListener('click', () => {
   }
 });
 const modalDataMap = {};
+const transferMeta = {};
+
+// ── Transfer ──────────────────────────────────────────────────────────────────
+
+/**
+ * Transfer an item. If moving between characters, does vault as intermediate.
+ * destCharId: character ID to send to, or null for vault.
+ */
+async function transferItem(instanceId, destCharId) {
+  const meta = transferMeta[instanceId];
+  if (!meta) return { ok: false, error: 'No transfer metadata for this item' };
+
+  const { itemHash, characterId: sourceCharId, transferStatus, location } = meta;
+  const LOCATION_CHARACTER = 1;
+  const LOCATION_VAULT = 2;
+
+  if (transferStatus !== 0) {
+    return { ok: false, error: transferStatus === 1 ? 'Item is equipped — unequip it first' : 'Item cannot be transferred' };
+  }
+
+  const doTransfer = async (charId, toVault) => {
+    const res = await fetch('/api/transfer', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ itemId: instanceId, itemHash, characterId: charId, transferToVault: toVault }),
+    });
+    return res.json();
+  };
+
+  try {
+    if (destCharId === null) {
+      // Move to vault
+      if (location === LOCATION_VAULT) return { ok: false, error: 'Item is already in the vault' };
+      return await doTransfer(sourceCharId, true);
+    } else {
+      // Move to a character
+      if (location === LOCATION_CHARACTER && sourceCharId === destCharId) {
+        return { ok: false, error: 'Item is already on that character' };
+      }
+      if (location === LOCATION_CHARACTER) {
+        // Character → vault first
+        const step1 = await doTransfer(sourceCharId, true);
+        if (!step1.ok) return step1;
+      }
+      // Vault → destination character
+      return await doTransfer(destCharId, false);
+    }
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function handleEquip(instanceId, charId, btnEl) {
+  btnEl.disabled = true;
+  btnEl.querySelector('.transfer-btn-label').textContent = '…';
+  const res    = await fetch('/api/equip', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ itemId: instanceId, characterId: charId }),
+  });
+  const result = await res.json();
+  if (result.ok) {
+    const meta = transferMeta[instanceId];
+    if (meta) {
+      meta.transferStatus = 1; // now equipped
+      meta.characterId    = charId;
+      meta.location       = 1;
+    }
+    renderTransferButtons(instanceId);
+    refreshInventoryBackground();
+  } else {
+    btnEl.disabled = false;
+    btnEl.querySelector('.transfer-btn-label').textContent = btnEl.dataset.label;
+    alert('Equip failed: ' + result.error);
+  }
+}
+
+async function handleTransfer(instanceId, destCharId, btnEl) {
+  btnEl.disabled = true;
+  btnEl.textContent = '…';
+  const result = await transferItem(instanceId, destCharId);
+  if (result.ok) {
+    // Update local metadata so buttons reflect new location
+    const meta = transferMeta[instanceId];
+    if (meta) {
+      meta.location   = destCharId === null ? 2 : 1;
+      meta.characterId = destCharId;
+    }
+    renderTransferButtons(instanceId);
+    // Also trigger a background inventory refresh so table stays current
+    refreshInventoryBackground();
+  } else {
+    btnEl.disabled = false;
+    btnEl.textContent = btnEl.dataset.label;
+    alert('Transfer failed: ' + result.error);
+  }
+}
+
+// Lightweight background refresh — updates RAW without showing the loading screen
+async function refreshInventoryBackground() {
+  try {
+    const res  = await fetch('/api/inventory');
+    const raw  = await res.json();
+    if (!raw.ok) return;
+    const data = JSON.parse(JSON.stringify(raw));
+    RAW = data.rows;
+    characters = data.characters ?? characters;
+    characterIds = data.characterIds ?? characterIds;
+    platformMembershipId = data.platformMembershipId ?? platformMembershipId;
+    for (const r of RAW) {
+      if (r.instanceId) {
+        if (r.modalData) modalDataMap[r.instanceId] = r.modalData;
+        if (r.itemHash !== undefined) {
+          transferMeta[r.instanceId] = {
+            itemHash: r.itemHash, characterId: r.characterId,
+            transferStatus: r.transferStatus, location: r.location,
+          };
+        }
+      }
+    }
+    render();
+  } catch { /* silent — user can manual refresh */ }
+}
+
+function renderTransferButtons(instanceId) {
+  const container = document.getElementById('modal-transfer-section');
+  if (!container) return;
+  const meta = transferMeta[instanceId];
+  if (!meta) { container.innerHTML = ''; return; }
+
+  const { characterId: currentCharId, transferStatus, location } = meta;
+  const LOCATION_VAULT = 2;
+  const canTransfer = transferStatus === 0;
+  const isEquipped  = transferStatus === 1;
+
+  let html = '<div class="manage-location-box">';
+  html += '<div class="manage-location-title">Manage Location</div>';
+
+  if (!canTransfer && !isEquipped) {
+    html += '<p class="transfer-disabled">This item cannot be transferred.</p>';
+  } else {
+    // ── Equip row ──────────────────────────────────────────────────────────
+    html += '<div class="manage-location-section">';
+    html += '<div class="manage-location-section-label">Equip</div>';
+    html += '<div class="transfer-group">';
+    for (const char of characters) {
+      const onThisChar   = location !== LOCATION_VAULT && currentCharId === char.characterId;
+      const alreadyEquip = isEquipped && onThisChar;
+      const canEquip     = onThisChar && !alreadyEquip;
+      const label        = char.raceName + ' ' + char.className;
+      const bgStyle      = char.emblemBackgroundPath
+        ? 'background-image:url(' + esc(char.emblemBackgroundPath) + ');background-size:cover;background-position:center left;'
+        : '';
+      html += '<button class="transfer-btn transfer-btn-emblem' + (alreadyEquip ? ' current' : '') + '"'
+        + (!canEquip ? ' disabled' : '')
+        + ' style="' + bgStyle + '"'
+        + ' data-label="' + esc(label) + '"'
+        + ' onclick="handleEquip(\'' + esc(instanceId) + '\',\'' + esc(char.characterId) + '\', this)">'
+        + '<span class="transfer-btn-label">' + esc(label) + '</span>'
+        + '</button>';
+    }
+    html += '</div></div>';
+
+    // ── Move row ───────────────────────────────────────────────────────────
+    html += '<div class="manage-location-section">';
+    html += '<div class="manage-location-section-label">Move</div>';
+    html += '<div class="transfer-group">';
+
+    if (canTransfer) {
+      // Vault button
+      const inVault = location === LOCATION_VAULT;
+      html += '<button class="transfer-btn' + (inVault ? ' current' : '') + '"'
+        + (inVault ? ' disabled' : '')
+        + ' data-label="📦 Vault"'
+        + ' onclick="handleTransfer(\'' + esc(instanceId) + '\', null, this)">'
+        + '📦 Vault</button>';
+
+      for (const char of characters) {
+        const isCurrent = location !== LOCATION_VAULT && currentCharId === char.characterId;
+        const label     = char.raceName + ' ' + char.className;
+        const bgStyle   = char.emblemBackgroundPath
+          ? 'background-image:url(' + esc(char.emblemBackgroundPath) + ');background-size:cover;background-position:center left;'
+          : '';
+        html += '<button class="transfer-btn transfer-btn-emblem' + (isCurrent ? ' current' : '') + '"'
+          + (isCurrent ? ' disabled' : '')
+          + ' style="' + bgStyle + '"'
+          + ' data-label="' + esc(label) + '"'
+          + ' onclick="handleTransfer(\'' + esc(instanceId) + '\',\'' + esc(char.characterId) + '\', this)">'
+          + '<span class="transfer-btn-label">' + esc(label) + '</span>'
+          + '</button>';
+      }
+    } else {
+      html += '<span class="transfer-disabled">Unequip item before moving</span>';
+    }
+
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+}
 
 function renderModalTag(instanceId) {
   const tag = getTag(instanceId);
@@ -931,6 +1202,7 @@ function openModal(instanceId, name, icon, type, rarity, damage, damageRaw, ligh
     '<span style="color:var(--text-dim);font-size:12px">' + esc(type) + '</span>';
 
   renderModalTag(instanceId);
+  renderTransferButtons(instanceId);
 
   const body = document.getElementById('modal-content');
   if (!data) {

@@ -32,7 +32,7 @@ import {
   resolveMembershipType,
   getMembershipId,
   buildManifestData,
-  getCharacterIds,
+  getCharacters,
   getCharacterWeapons,
   getVaultWeapons,
   extractPerkNames,
@@ -229,7 +229,8 @@ function buildModalData(stub, itemData, talentGridMap) {
 async function runEvaluation(bungieToken, bungieNetMembershipId) {
   const { weaponHashes, itemDataMap, talentGridMap } = await buildManifestData(API_KEY);
   const platformMembershipId = await getMembershipId(membershipType, API_KEY, bungieToken, bungieNetMembershipId);
-  const characterIds = await getCharacterIds(membershipType, platformMembershipId, API_KEY, bungieToken);
+  const characters    = await getCharacters(membershipType, platformMembershipId, API_KEY, bungieToken);
+  const characterIds  = characters.map(c => c.characterId);
 
   const weaponStubs = [];
   for (const charId of characterIds) {
@@ -257,7 +258,15 @@ async function runEvaluation(bungieToken, bungieNetMembershipId) {
     const light        = stub.primaryStat?.value ?? stub.itemLevel ?? null;
     const modalData    = buildModalData(stub, itemData, talentGridMap);
 
-    results.push({ instanceId: stub.itemInstanceId, name, itemTypeName, tierType, damageType, icon, isCurated, light, byColumn, all, allPossible, evaluation, modalData });
+    results.push({
+      instanceId:     stub.itemInstanceId,
+      itemHash:       stub.itemHash,
+      characterId:    stub.characterId ?? null,
+      transferStatus: stub.transferStatus ?? 0,
+      location:       stub.location ?? 1,
+      name, itemTypeName, tierType, damageType, icon, isCurated, light,
+      byColumn, all, allPossible, evaluation, modalData,
+    });
   }
 
   // Sort: best result first, then alpha
@@ -298,12 +307,19 @@ async function runEvaluation(bungieToken, bungieNetMembershipId) {
         col4:       curated ? '—' : colCell(w('col4'), r.byColumn, r.all, gridMap['col4'], r.allPossible),
         result:     curated ? '⚙ Curated Roll' : result,
         resultRank: curated ? 4 : (RESULT_RANK[result] ?? 99),
-        modalData:  mode === 'PvP' ? r.modalData : undefined,
+        // Transfer metadata — only needed once per weapon, attach to PvP row
+        ...(mode === 'PvP' ? {
+          modalData:      r.modalData,
+          itemHash:       r.itemHash,
+          characterId:    r.characterId,
+          transferStatus: r.transferStatus,
+          location:       r.location,
+        } : {}),
       });
     }
   }
 
-  return rows;
+  return { rows, characters, characterIds, platformMembershipId };
 }
 
 // ---------------------------------------------------------------------------
@@ -492,8 +508,8 @@ app.post('/auth/logout', (req, res) => {
 
 app.get('/api/inventory', requireAuth, async (req, res) => {
   try {
-    const rows = await runEvaluation(req.token.access_token, req.token.membership_id);
-    res.json({ ok: true, rows });
+    const { rows, characters, characterIds, platformMembershipId } = await runEvaluation(req.token.access_token, req.token.membership_id);
+    res.json({ ok: true, rows, characters, characterIds, platformMembershipId });
   } catch (err) {
     console.error('[api/inventory] Error:', err);
     res.status(500).json({ ok: false, error: err.message });
@@ -501,8 +517,104 @@ app.get('/api/inventory', requireAuth, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Start
+// Transfer API
 // ---------------------------------------------------------------------------
+
+app.use(express.json());
+
+/**
+ * POST /api/transfer
+ * Body: { itemId, itemHash, characterId, transferToVault }
+ *
+ * Proxies to /Platform/Destiny/TransferItem/ using the session token.
+ * transferToVault=true  → move item to vault   (characterId = source character)
+ * transferToVault=false → pull from vault       (characterId = destination character)
+ *
+ * To move between characters, two calls are needed:
+ *   1. character → vault  (transferToVault: true,  characterId: sourceCharId)
+ *   2. vault → character  (transferToVault: false, characterId: destCharId)
+ * The client handles this sequencing.
+ */
+app.post('/api/transfer', requireAuth, async (req, res) => {
+  const { itemId, itemHash, characterId, transferToVault } = req.body ?? {};
+  if (!itemId || !itemHash || !characterId || transferToVault === undefined) {
+    return res.status(400).json({ ok: false, error: 'Missing required fields: itemId, itemHash, characterId, transferToVault' });
+  }
+
+  try {
+    const body = {
+      membershipType:    membershipType,
+      itemReferenceHash: itemHash,
+      itemId:            itemId,
+      stackSize:         1,
+      characterId:       characterId,
+      transferToVault:   transferToVault,
+    };
+
+    const bungieRes = await fetch('https://www.bungie.net/Platform/Destiny/TransferItem/', {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'X-API-Key':     API_KEY,
+        'Authorization': `Bearer ${req.token.access_token}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await bungieRes.json();
+    if (data.ErrorCode !== 1) {
+      console.error('[api/transfer] Bungie error:', data.Message);
+      return res.status(400).json({ ok: false, error: data.Message ?? `ErrorCode ${data.ErrorCode}` });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[api/transfer] Error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/equip
+ * Body: { itemId, characterId }
+ * Equips an item on the specified character.
+ * The item must already be on that character's inventory.
+ */
+app.post('/api/equip', requireAuth, async (req, res) => {
+  const { itemId, characterId } = req.body ?? {};
+  if (!itemId || !characterId) {
+    return res.status(400).json({ ok: false, error: 'Missing required fields: itemId, characterId' });
+  }
+
+  try {
+    const body = {
+      membershipType: membershipType,
+      itemId:         itemId,
+      characterId:    characterId,
+    };
+
+    const bungieRes = await fetch('https://www.bungie.net/Platform/Destiny/EquipItem/', {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'X-API-Key':     API_KEY,
+        'Authorization': `Bearer ${req.token.access_token}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await bungieRes.json();
+    if (data.ErrorCode !== 1) {
+      console.error('[api/equip] Bungie error:', data.Message);
+      return res.status(400).json({ ok: false, error: data.Message ?? `ErrorCode ${data.ErrorCode}` });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[api/equip] Error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`\n=== D1 God Roll Evaluator ===`);

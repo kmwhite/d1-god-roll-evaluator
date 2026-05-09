@@ -206,6 +206,38 @@ export async function getCharacterIds(membershipType, membershipId, apiKey, acce
   return (data.data?.characters ?? []).map((c) => c.characterBase.characterId);
 }
 
+const CLASS_NAMES = { 0: 'Titan', 1: 'Hunter', 2: 'Warlock' };
+
+// D1 race hashes — only 3 races exist
+const RACE_HASHES = {
+  898834093:  'Exo',
+  2803282938: 'Awoken',
+  3887404748: 'Human',
+};
+
+/**
+ * Fetch character IDs alongside display info (class, race, emblem).
+ * Returns an array of { characterId, className, raceName, emblemPath, emblemBackgroundPath, lightLevel }.
+ */
+export async function getCharacters(membershipType, membershipId, apiKey, accessToken) {
+  const data = await bungieGet(
+    `/Destiny/${membershipType}/Account/${membershipId}/Summary/`,
+    apiKey, accessToken
+  );
+  return (data.data?.characters ?? []).map((c) => {
+    const base = c.characterBase;
+    return {
+      characterId:          base.characterId,
+      className:            CLASS_NAMES[base.classType]   ?? `Class${base.classType}`,
+      raceName:             RACE_HASHES[base.raceHash]    ?? `Unknown`,
+      // emblemPath = small square icon; backgroundPath = wide rectangular banner
+      emblemPath:           c.emblemPath     ? `https://www.bungie.net${c.emblemPath}`     : null,
+      emblemBackgroundPath: c.backgroundPath ? `https://www.bungie.net${c.backgroundPath}` : null,
+      lightLevel:           base.powerLevel ?? null,
+    };
+  });
+}
+
 /**
  * Fetch weapon item stubs from a character's inventory.
  *
