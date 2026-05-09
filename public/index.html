@@ -550,6 +550,7 @@
   </div>
   <div class="header-right">
     <span class="guardian-name" id="guardian-name"></span>
+    <select id="platform-select" style="display:none;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;padding:4px 8px;cursor:pointer;letter-spacing:0.06em"></select>
     <div class="search-wrap" id="header-search" style="display:none">
       <input type="text" id="search" placeholder="Search weapon name…">
     </div>
@@ -788,7 +789,44 @@ async function checkAuth() {
   document.getElementById('header-search').style.display = 'block';
   document.getElementById('header-sub').textContent =
     'DESTINY 1 // ' + (data.platform ?? '').toUpperCase() + ' // ' + (data.displayName ?? '').toUpperCase();
+  await loadPlatforms(data.membershipType);
   return true;
+}
+
+async function loadPlatforms(currentMembershipType) {
+  const sel = document.getElementById('platform-select');
+  try {
+    const res  = await fetch('/api/platforms');
+    const data = await res.json();
+    if (!data.ok || data.memberships.length <= 1) {
+      // Only one platform — no selector needed
+      sel.style.display = 'none';
+      return;
+    }
+    sel.innerHTML = data.memberships.map(m =>
+      '<option value="' + m.membershipType + '"' + (m.current ? ' selected' : '') + '>'
+      + m.platform + ' — ' + esc(m.displayName) + '</option>'
+    ).join('');
+    sel.style.display = 'inline-block';
+    sel.addEventListener('change', async () => {
+      const newType = parseInt(sel.value, 10);
+      await fetch('/api/platform', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ membershipType: newType }),
+      });
+      // Reset and reload inventory for the new platform
+      RAW = [];
+      vendorRows_ = [];
+      vendorsLoaded = false;
+      Object.keys(modalDataMap).forEach(k => delete modalDataMap[k]);
+      Object.keys(transferMeta).forEach(k => delete transferMeta[k]);
+      document.getElementById('vendors-container').innerHTML = '';
+      await loadInventory();
+    });
+  } catch {
+    sel.style.display = 'none';
+  }
 }
 
 document.getElementById('btn-logout').addEventListener('click', async () => {

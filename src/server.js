@@ -226,18 +226,19 @@ function buildModalData(stub, itemData, talentGridMap) {
  * Run the full evaluation pipeline for the given Bungie token.
  * Returns the htmlRows array ready for the browser to render.
  */
-async function runEvaluation(bungieToken, bungieNetMembershipId) {
+async function runEvaluation(bungieToken, bungieNetMembershipId, membershipTypeOverride) {
+  const mt = membershipTypeOverride ?? membershipType;
   const { weaponHashes, itemDataMap, talentGridMap } = await buildManifestData(API_KEY);
-  const platformMembershipId = await getMembershipId(membershipType, API_KEY, bungieToken, bungieNetMembershipId);
-  const characters    = await getCharacters(membershipType, platformMembershipId, API_KEY, bungieToken);
+  const platformMembershipId = await getMembershipId(mt, API_KEY, bungieToken, bungieNetMembershipId);
+  const characters    = await getCharacters(mt, platformMembershipId, API_KEY, bungieToken);
   const characterIds  = characters.map(c => c.characterId);
 
   const weaponStubs = [];
   for (const charId of characterIds) {
-    const weapons = await getCharacterWeapons(membershipType, platformMembershipId, charId, API_KEY, bungieToken);
+    const weapons = await getCharacterWeapons(mt, platformMembershipId, charId, API_KEY, bungieToken);
     weaponStubs.push(...weapons);
   }
-  const vaultWeapons = await getVaultWeapons(membershipType, platformMembershipId, weaponHashes, API_KEY, bungieToken);
+  const vaultWeapons = await getVaultWeapons(mt, platformMembershipId, weaponHashes, API_KEY, bungieToken);
   weaponStubs.push(...vaultWeapons);
 
   const instanced = weaponStubs.filter(s => s.itemInstanceId && weaponHashes.has(s.itemHash));
@@ -353,11 +354,12 @@ const WEAPON_BUCKET_HASHES_ARRAY = [1498876634, 2465295065, 953998645];
 const WEAPON_BUCKET_SET = new Set(WEAPON_BUCKET_HASHES_ARRAY);
 const SLOT_NAMES_V = { 1498876634: 'Primary', 2465295065: 'Special', 953998645: 'Heavy' };
 
-async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap, itemDataMap) {
-  const platformMembershipId = await getMembershipId(membershipType, API_KEY, bungieToken, bungieNetMembershipId);
+async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap, itemDataMap, membershipTypeOverride) {
+  const mt = membershipTypeOverride ?? membershipType;
+  const platformMembershipId = await getMembershipId(mt, API_KEY, bungieToken, bungieNetMembershipId);
 
   // Use first character — vendor inventories are the same across characters for social vendors
-  const characters = await getCharacters(membershipType, platformMembershipId, API_KEY, bungieToken);
+  const characters = await getCharacters(mt, platformMembershipId, API_KEY, bungieToken);
   if (!characters.length) throw new Error('No characters found');
   const charId = characters[0].characterId;
 
@@ -365,7 +367,7 @@ async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap
   const vendorResults = await Promise.all(VENDORS.map(async vendor => {
     try {
       const res = await fetch(
-        `https://www.bungie.net/Platform/Destiny/${membershipType}/MyAccount/Character/${charId}/Vendor/${vendor.hash}/`,
+        `https://www.bungie.net/Platform/Destiny/${mt}/MyAccount/Character/${charId}/Vendor/${vendor.hash}/`,
         { headers: { 'X-API-Key': API_KEY, 'Authorization': `Bearer ${bungieToken}` } }
       );
       const data = await res.json();
@@ -498,7 +500,6 @@ async function requireAuth(req, res, next) {
   if (!t) return res.status(401).json({ error: 'Not authenticated' });
 
   if (Date.now() > t.expires_at) {
-    // Try to refresh
     if (!t.refresh_token || (t.refresh_expires_at && Date.now() > t.refresh_expires_at)) {
       req.session.destroy(() => {});
       return res.status(401).json({ error: 'Session expired — please log in again' });
@@ -515,6 +516,8 @@ async function requireAuth(req, res, next) {
   }
 
   req.token = req.session.token;
+  // Use per-session platform if set, otherwise fall back to env var default
+  req.membershipType = req.session.membershipType ?? membershipType;
   next();
 }
 
@@ -606,6 +609,7 @@ app.get('/callback', async (req, res) => {
 
 app.get('/auth/status', async (req, res) => {
   const t = req.session.token;
+  const mt = req.session.membershipType ?? membershipType;
   console.log(`[auth/status] session token present: ${!!t}`);
   if (!t) return res.json({ authenticated: false });
 
@@ -625,11 +629,12 @@ app.get('/auth/status', async (req, res) => {
     );
     const profileData = await profileRes.json();
     const memberships = profileData.Response?.destinyMemberships ?? [];
-    const match = memberships.find(m => m.membershipType === membershipType) ?? memberships[0];
+    const match = memberships.find(m => m.membershipType === mt) ?? memberships[0];
     res.json({
       authenticated: true,
       displayName:   match?.displayName ?? 'Guardian',
-      platform:      PLATFORM,
+      platform:      PLATFORM_NAMES[req.membershipType] ?? PLATFORM,
+      membershipType: req.membershipType,
     });
   } catch {
     res.json({ authenticated: true, displayName: 'Guardian', platform: PLATFORM });
@@ -646,7 +651,9 @@ app.post('/auth/logout', (req, res) => {
 
 app.get('/api/inventory', requireAuth, async (req, res) => {
   try {
-    const { rows, characters, characterIds, platformMembershipId } = await runEvaluation(req.token.access_token, req.token.membership_id);
+    const { rows, characters, characterIds, platformMembershipId } = await runEvaluation(
+      req.token.access_token, req.token.membership_id, req.membershipType
+    );
     res.json({ ok: true, rows, characters, characterIds, platformMembershipId });
   } catch (err) {
     console.error('[api/inventory] Error:', err);
@@ -659,7 +666,7 @@ app.get('/api/vendors', requireAuth, async (req, res) => {
     const { weaponHashes, itemDataMap, talentGridMap } = await buildManifestData(API_KEY);
     const sections = await buildVendorRows(
       req.token.access_token, req.token.membership_id,
-      talentGridMap, itemDataMap
+      talentGridMap, itemDataMap, req.membershipType
     );
     res.json({ ok: true, sections });
   } catch (err) {
@@ -669,6 +676,44 @@ app.get('/api/vendors', requireAuth, async (req, res) => {
 });
 
 app.use(express.json());
+
+// ---------------------------------------------------------------------------
+// Platform switching
+// ---------------------------------------------------------------------------
+
+const PLATFORM_NAMES = { 1: 'Xbox', 2: 'PSN', 4: 'PC' };
+
+app.get('/api/platforms', requireAuth, async (req, res) => {
+  try {
+    const bRes = await fetch(
+      `https://www.bungie.net/Platform/User/GetMembershipsById/${req.token.membership_id}/254/`,
+      { headers: { 'X-API-Key': API_KEY, 'Authorization': `Bearer ${req.token.access_token}` } }
+    );
+    const data = await bRes.json();
+    const memberships = (data.Response?.destinyMemberships ?? []).map(m => ({
+      membershipType: m.membershipType,
+      membershipId:   m.membershipId,
+      displayName:    m.displayName,
+      platform:       PLATFORM_NAMES[m.membershipType] ?? `Type${m.membershipType}`,
+      current:        m.membershipType === req.membershipType,
+    }));
+    res.json({ ok: true, memberships, current: req.membershipType });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/platform', requireAuth, async (req, res) => {
+  const { membershipType: newType } = req.body ?? {};
+  if (![1, 2, 4].includes(newType)) {
+    return res.status(400).json({ ok: false, error: 'Invalid membershipType' });
+  }
+  req.session.membershipType = newType;
+  await new Promise((resolve, reject) =>
+    req.session.save(err => err ? reject(err) : resolve())
+  );
+  res.json({ ok: true, membershipType: newType, platform: PLATFORM_NAMES[newType] });
+});
 
 /**
  * POST /api/transfer
@@ -691,8 +736,7 @@ app.post('/api/transfer', requireAuth, async (req, res) => {
 
   try {
     const body = {
-      membershipType:    membershipType,
-      itemReferenceHash: itemHash,
+      membershipType:    req.membershipType,
       itemId:            itemId,
       stackSize:         1,
       characterId:       characterId,
@@ -736,8 +780,7 @@ app.post('/api/equip', requireAuth, async (req, res) => {
 
   try {
     const body = {
-      membershipType: membershipType,
-      itemId:         itemId,
+      membershipType: req.membershipType,
       characterId:    characterId,
     };
 
