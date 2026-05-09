@@ -88,35 +88,6 @@ export function evaluateWeapon(weaponName, itemPerks) {
 }
 
 /**
- * Build the DIM tag and notes string for a weapon based on its evaluation.
- *
- * Tag priority (DIM supports one tag per item):
- *   'favorite' → god roll in EITHER PvP or PvE
- *   'keep'     → close in at least one mode, not god roll in either
- *   no tag     → not a god roll / close in either mode
- *
- * @param {WeaponEvaluation} evaluation
- * @returns {{ tag: string | null, notes: string }}
- */
-export function buildDimAnnotation(evaluation) {
-  const { pvp, pve } = evaluation;
-
-  const isGodRoll = pvp.status === 'god_roll' || pve.status === 'god_roll';
-  const isClose = pvp.status === 'close' || pve.status === 'close';
-
-  let tag = null;
-  if (isGodRoll) tag = 'favorite';
-  else if (isClose) tag = 'keep';
-
-  // Build a concise notes string
-  const pvpLine = formatLine('PvP', pvp);
-  const pveLine = formatLine('PvE', pve);
-  const notes = `${pvpLine} | ${pveLine}`;
-
-  return { tag, notes };
-}
-
-/**
  * @param {string} label
  * @param {RollResult} result
  */

@@ -305,7 +305,7 @@ export async function getItemDetail(membershipType, membershipId, characterId, i
  */
 export function extractPerkNames(stub, _perkMap, talentGridMap) {
   const gridHash = stub.talentGridHash;
-  const byColumn = new Map(); // gridColumn (int) → string[]
+  const byColumn_ = new Map(); // gridColumn (int) → string[]
 
   if (gridHash) {
     const gridNodes  = talentGridMap.get(gridHash) ?? [];
@@ -316,19 +316,21 @@ export function extractPerkNames(stub, _perkMap, talentGridMap) {
       const stubNode = stubNodes[i];
       const col = nodeDef.column ?? -1;
 
-      if (!byColumn.has(col)) byColumn.set(col, []);
+      if (!byColumn_.has(col)) byColumn_.set(col, []);
 
-      if (!stubNode) continue; // no instance data for this node
+      if (!stubNode) continue;
 
-      // stepIndex tells us which step this instance rolled for this node
       const stepIdx = stubNode.stepIndex ?? 0;
       const step = (nodeDef.steps ?? [])[stepIdx];
       const name = step?.nodeStepName?.trim();
-      if (name) byColumn.get(col).push(name);
+      if (name) byColumn_.get(col).push(name);
     }
   }
 
-  const result = new Map([...byColumn.entries()].map(([k, v]) => [k, [...new Set(v)]]));
-  result.all = [...new Set([...byColumn.values()].flat())];
-  return result;
+  const byColumnObj = {};
+  for (const [k, v] of byColumn_.entries()) {
+    byColumnObj[k] = [...new Set(v)];
+  }
+  const all = [...new Set(Object.values(byColumnObj).flat())];
+  return { byColumn: byColumnObj, all };
 }
