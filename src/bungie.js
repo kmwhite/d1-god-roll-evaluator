@@ -140,6 +140,7 @@ export async function buildManifestData(apiKey) {
         tierType:       def.tierType ?? 0,
         itemTypeName:   def.itemTypeName ?? '',
         talentGridHash: def.talentGridHash ?? null,
+        bucketTypeHash: def.bucketTypeHash ?? null,
         icon:           def.icon ?? null,
         isCurated,
       });

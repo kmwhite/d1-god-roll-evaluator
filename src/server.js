@@ -328,8 +328,141 @@ async function runEvaluation(bungieToken, bungieNetMembershipId) {
 }
 
 // ---------------------------------------------------------------------------
-// Token refresh
+// Vendor pipeline
 // ---------------------------------------------------------------------------
+
+// Confirmed D1 vendor hashes from DestinyVendorDefinition manifest table
+const VENDORS = [
+  { hash: 570929315,  name: 'Banshee-44',        location: 'Tower',  social: true  },
+  { hash: 3746647075, name: 'Lord Shaxx',         location: 'Tower',  social: true  },
+  { hash: 3658200622, name: 'Arcite 99-40',       location: 'Tower',  social: true  },
+  { hash: 1990950,    name: 'Commander Zavala',   location: 'Tower',  social: true  },
+  { hash: 3003633346, name: 'Cayde-6',            location: 'Tower',  social: true  },
+  { hash: 1575820975, name: 'Ikora Rey',          location: 'Tower',  social: true  },
+  { hash: 174528503,  name: 'Eris Morn',          location: 'Tower',  social: true  },
+  { hash: 2668878854, name: 'Roni 55-30',         location: 'Tower',  social: true  },
+  { hash: 1998812735, name: 'Variks',             location: 'Reef',   social: true  },
+  { hash: 1808244981, name: 'Executor Hideo',     location: 'Tower',  social: true  },
+  { hash: 1821699360, name: 'Lakshmi-2',          location: 'Tower',  social: true  },
+  { hash: 3611686524, name: 'Arach Jalaal',       location: 'Tower',  social: true  },
+  { hash: 2796397637, name: 'Xûr',               location: 'Varies', social: false },
+  { hash: 1410745145, name: 'Petra Venj',         location: 'Reef',   social: true  },
+];
+
+const WEAPON_BUCKET_HASHES_ARRAY = [1498876634, 2465295065, 953998645];
+const WEAPON_BUCKET_SET = new Set(WEAPON_BUCKET_HASHES_ARRAY);
+const SLOT_NAMES_V = { 1498876634: 'Primary', 2465295065: 'Special', 953998645: 'Heavy' };
+
+async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap, itemDataMap) {
+  const platformMembershipId = await getMembershipId(membershipType, API_KEY, bungieToken, bungieNetMembershipId);
+
+  // Use first character — vendor inventories are the same across characters for social vendors
+  const characters = await getCharacters(membershipType, platformMembershipId, API_KEY, bungieToken);
+  if (!characters.length) throw new Error('No characters found');
+  const charId = characters[0].characterId;
+
+  // Fetch all vendors in parallel
+  const vendorResults = await Promise.all(VENDORS.map(async vendor => {
+    try {
+      const res = await fetch(
+        `https://www.bungie.net/Platform/Destiny/${membershipType}/MyAccount/Character/${charId}/Vendor/${vendor.hash}/`,
+        { headers: { 'X-API-Key': API_KEY, 'Authorization': `Bearer ${bungieToken}` } }
+      );
+      const data = await res.json();
+      return { vendor, data };
+    } catch {
+      return { vendor, data: null };
+    }
+  }));
+
+  const vendorSections = [];
+
+  for (const { vendor, data } of vendorResults) {
+    if (!data || data.ErrorCode !== 1) {
+      // Vendor not available (e.g. Xûr not present) — include with empty weapons
+      if (data?.ErrorCode !== 1627 || vendor.hash !== 2796397637) {
+        // Only skip Xûr when not found; show all others even on error
+        vendorSections.push({ vendor, rows: [], available: false, error: data?.Message ?? 'Unavailable' });
+      }
+      // Xûr specifically: skip entirely when not available
+      if (vendor.hash === 2796397637) continue;
+      vendorSections.push({ vendor, rows: [], available: false, error: data?.Message ?? 'Unavailable' });
+      continue;
+    }
+
+    const vd = data.Response?.data;
+    const available = vd?.enabled !== false;
+    const rows = [];
+
+    // Collect weapon sale items
+    for (const cat of vd?.saleItemCategories ?? []) {
+      for (const si of cat.saleItems ?? []) {
+        const stub = si.item;
+        if (!stub) continue;
+        const itemData = itemDataMap.get(stub.itemHash);
+        if (!itemData) continue;
+        if (!WEAPON_BUCKET_SET.has(itemData.bucketTypeHash ?? 0)) continue;
+
+        // Use itemData.talentGridHash as authoritative fallback —
+        // vendor stubs often have talentGridHash: 0 even for valid weapons
+        const gridHash = stub.talentGridHash || itemData.talentGridHash;
+        if (!gridHash) continue; // genuinely no talent grid (consumables, materials)
+        const patchedStub = gridHash !== stub.talentGridHash
+          ? { ...stub, talentGridHash: gridHash }
+          : stub;
+
+        // Vendor items all have itemInstanceId: 0 — generate a unique stable ID
+        // using itemHash + vendorHash so pairs group correctly in the UI
+        const instanceId   = `vendor-${vendor.hash}-${stub.itemHash}`;
+        const name         = itemData.name;
+        const itemTypeName = itemData.itemTypeName ?? '';
+        const tierType     = itemData.tierType ?? 0;
+        const icon         = itemData.icon ?? null;
+        const isCurated    = itemData.isCurated ?? false;
+        const damageType   = patchedStub.damageType ?? 0;
+        const slot         = SLOT_NAMES_V[itemData.bucketTypeHash] ?? 'Unknown';
+        const perks        = extractPerkNames(patchedStub, null, talentGridMap);
+        const allPossible  = buildAllPossiblePerks(patchedStub, talentGridMap);
+        const evaluation   = evaluateWeapon(name, perks.all);
+        const modalData    = buildModalData(patchedStub, itemData, talentGridMap);
+
+        for (const mode of ['PvP', 'PvE']) {
+          const rollDef    = mode === 'PvP' ? PVP[name] : PVE[name];
+          const evalResult = mode === 'PvP' ? evaluation.pvp : evaluation.pve;
+          const gridMap    = mapGodRollToGridColumns(rollDef, perks.byColumn);
+          const w          = col => rollDef ? (rollDef[col] ?? []) : null;
+          const isError    = hasDefinitionError(rollDef, allPossible);
+          const result     = modeResult(evalResult.status, isError);
+          const curated    = isCurated;
+
+          rows.push({
+            instanceId,
+            icon:       icon ? `https://www.bungie.net${icon}` : null,
+            name,
+            type:       itemTypeName,
+            slot,
+            rarity:     TIER_NAMES[tierType]    ?? `Tier${tierType}`,
+            damage:     DAMAGE_NAMES[damageType] ?? '—',
+            damageRaw:  damageType,
+            light:      null, // vendor items don't have meaningful light levels
+            mode,
+            col1:       curated ? '—' : colCell(w('col1'), perks.byColumn, perks.all, gridMap['col1'], allPossible),
+            col2:       curated ? '—' : colCell(w('col2'), perks.byColumn, perks.all, gridMap['col2'], allPossible),
+            col3:       curated ? '—' : colCell(w('col3'), perks.byColumn, perks.all, gridMap['col3'], allPossible),
+            col4:       curated ? '—' : colCell(w('col4'), perks.byColumn, perks.all, gridMap['col4'], allPossible),
+            result:     curated ? '⚙ Curated Roll' : result,
+            resultRank: curated ? 4 : (RESULT_RANK[result] ?? 99),
+            modalData:  mode === 'PvP' ? modalData : undefined,
+          });
+        }
+      }
+    }
+
+    vendorSections.push({ vendor, rows, available });
+  }
+
+  return vendorSections;
+}
 
 async function refreshToken(refreshTokenValue) {
   const body = new URLSearchParams({
@@ -521,9 +654,19 @@ app.get('/api/inventory', requireAuth, async (req, res) => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// Transfer API
-// ---------------------------------------------------------------------------
+app.get('/api/vendors', requireAuth, async (req, res) => {
+  try {
+    const { weaponHashes, itemDataMap, talentGridMap } = await buildManifestData(API_KEY);
+    const sections = await buildVendorRows(
+      req.token.access_token, req.token.membership_id,
+      talentGridMap, itemDataMap
+    );
+    res.json({ ok: true, sections });
+  } catch (err) {
+    console.error('[api/vendors] Error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 app.use(express.json());
 
