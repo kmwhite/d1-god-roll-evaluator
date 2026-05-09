@@ -51,14 +51,15 @@ const PLATFORM       = process.env.D1_GOD_ROLL_EVALUATOR_PLATFORM;
 const CLIENT_ID      = process.env.D1_GOD_ROLL_EVALUATOR_CLIENT_ID;
 const CLIENT_SECRET  = process.env.D1_GOD_ROLL_EVALUATOR_CLIENT_SECRET;
 const API_KEY        = process.env.D1_GOD_ROLL_EVALUATOR_API_KEY;
-const PORT           = parseInt(process.env.D1_GOD_ROLL_EVALUATOR_PORT ?? '3000', 10);
+// Gandi injects PORT; our custom var is a local dev fallback
+const PORT = parseInt(process.env.PORT ?? process.env.D1_GOD_ROLL_EVALUATOR_PORT ?? '3000', 10);
 const SESSION_SECRET = process.env.D1_GOD_ROLL_EVALUATOR_SESSION_SECRET;
 if (!SESSION_SECRET) {
   console.error('[server] Missing required env var: D1_GOD_ROLL_EVALUATOR_SESSION_SECRET');
   console.error('         Generate one with: openssl rand -hex 32');
   process.exit(1);
 }
-const REDIRECT_URI   = process.env.D1_GOD_ROLL_EVALUATOR_REDIRECT_URI ?? 'https://krypnos.net/callback';
+const REDIRECT_URI   = process.env.D1_GOD_ROLL_EVALUATOR_REDIRECT_URI ?? 'https://d1armory.net/callback';
 
 const REQUIRED = { PLATFORM, CLIENT_ID, CLIENT_SECRET, API_KEY };
 for (const [k, v] of Object.entries(REQUIRED)) {
@@ -807,8 +808,8 @@ app.post('/api/equip', requireAuth, async (req, res) => {
   }
 });
 
-app.listen(PORT, '127.0.0.1', () => {
+app.listen(PORT, () => {
   console.log(`\n=== D1 God Roll Evaluator ===`);
-  console.log(`Server listening on http://127.0.0.1:${PORT}`);
-  console.log(`Open https://krypnos.net/ in your browser\n`);
+  console.log(`Server listening on port ${PORT}`);
+  console.log(`Open https://d1armory.net/ in your browser\n`);
 });
