@@ -26,7 +26,23 @@ import session        from 'express-session';
 import FileStore      from 'session-file-store';
 import { fileURLToPath } from 'url';
 import path           from 'path';
-import { mkdirSync } from 'fs';
+import { mkdirSync, existsSync, readFileSync } from 'fs';
+
+// Load .env file if present (Gandi deployment or local dev)
+const __dirname_env = path.dirname(fileURLToPath(import.meta.url));
+const envPath = path.join(__dirname_env, '..', '.env');
+if (existsSync(envPath)) {
+  for (const line of readFileSync(envPath, 'utf8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const val = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '');
+    if (!(key in process.env)) process.env[key] = val;
+  }
+  console.log('[server] Loaded .env');
+}
 
 import {
   resolveMembershipType,
