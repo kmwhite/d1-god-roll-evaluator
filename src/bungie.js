@@ -130,7 +130,7 @@ export async function buildManifestData(apiKey) {
         icon:           def.icon ?? null,
         isCurated,
       });
-      if (def.tierType === 5 || def.tierType === 6) weaponHashes.add(def.itemHash);
+      weaponHashes.add(def.itemHash);
     }
   } finally {
     db.close();

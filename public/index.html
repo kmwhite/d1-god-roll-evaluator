@@ -154,24 +154,59 @@
 
   /* ── Controls ── */
   .controls {
-    padding: 16px 40px;
-    display: flex; gap: 12px; align-items: center;
-    border-bottom: 1px solid var(--border); flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+  }
+  .controls-row {
+    padding: 8px 40px;
+    display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  }
+  .controls-row + .controls-row {
+    border-top: 1px solid var(--border);
+    background: rgba(0,0,0,0.15);
+  }
+  .controls-divider {
+    width: 1px; height: 16px;
+    background: var(--border-bright);
+    margin: 0 8px; flex-shrink: 0;
+  }
+  /* Each labelled group wraps as a unit — never breaks mid-group */
+  .filter-group {
+    display: flex; gap: 6px; align-items: center; flex-wrap: nowrap;
   }
   .filter-label {
-    font-size: 11px; letter-spacing: 0.12em;
+    font-size: 10px; letter-spacing: 0.12em;
     text-transform: uppercase; color: var(--text-dim);
-    font-family: 'Share Tech Mono', monospace;
+    font-family: 'Share Tech Mono', monospace; white-space: nowrap;
   }
   .filter-btn {
-    padding: 5px 14px; background: var(--surface2);
+    padding: 3px 10px; background: var(--surface2);
     border: 1px solid var(--border); color: var(--text-dim);
-    font-family: 'Rajdhani', sans-serif; font-size: 13px;
-    font-weight: 600; letter-spacing: 0.08em;
+    font-family: 'Rajdhani', sans-serif; font-size: 12px;
+    font-weight: 600; letter-spacing: 0.06em;
     text-transform: uppercase; cursor: pointer; transition: all 0.15s;
   }
   .filter-btn:hover { border-color: var(--border-bright); color: var(--text); }
   .filter-btn.active { background: var(--amber-glow); border-color: var(--amber); color: var(--amber-bright); }
+  .tag-filter-btn {
+    padding: 3px 10px; background: var(--surface2);
+    border: 1px solid var(--border); color: var(--text-dim);
+    font-family: 'Rajdhani', sans-serif; font-size: 12px;
+    font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; cursor: pointer; transition: all 0.15s;
+  }
+  .tag-filter-btn:hover { border-color: var(--border-bright); color: var(--text); }
+  .tag-filter-btn.active { background: rgba(120,80,200,0.12); border-color: #7b5ea7; color: #a888d0; }
+  .mode-filter-btn {
+    padding: 3px 10px; background: var(--surface2);
+    border: 1px solid var(--border); color: var(--text-dim);
+    font-family: 'Rajdhani', sans-serif; font-size: 12px;
+    font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; cursor: pointer; transition: all 0.15s;
+  }
+  .mode-filter-btn:hover { border-color: var(--border-bright); color: var(--text); }
+  .mode-filter-btn.active               { background: rgba(60,120,200,0.1); border-color: #4a7c9e; color: #7ab0d0; }
+  .mode-filter-btn.active[data-mode="pvp"] { background: rgba(200,80,80,0.08); border-color: rgba(200,80,80,0.5); color: #e06060; }
+  .mode-filter-btn.active[data-mode="pve"] { background: rgba(60,120,200,0.08); border-color: rgba(60,120,200,0.5); color: #60a0e0; }
   .search-wrap { margin-left: auto; position: relative; }
   .search-wrap::before {
     content: '⌕'; position: absolute; left: 10px; top: 50%;
@@ -230,6 +265,8 @@
   .badge.legendary { color: var(--legendary); }
   .badge.exotic    { color: var(--exotic); background: rgba(200,146,42,0.08); }
   .badge.rare      { color: var(--rare); }
+  .badge.uncommon  { color: #4a9a5a; }
+  .badge.common    { color: #7a8a8a; }
   .damage-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; }
   .damage-dot::before { content: ''; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .damage-dot.kinetic::before { background: var(--kinetic); }
@@ -374,6 +411,10 @@
   </div>
   <div class="header-right">
     <span class="guardian-name" id="guardian-name"></span>
+    <div class="search-wrap" id="header-search" style="display:none">
+      <input type="text" id="search" placeholder="Search weapon name…">
+    </div>
+    <button class="btn btn-sm" id="btn-refresh" style="display:none">↻ Refresh</button>
     <button class="btn btn-sm" id="btn-logout" style="display:none">Log Out</button>
   </div>
 </header>
@@ -403,24 +444,37 @@
 <!-- App -->
 <div id="app">
   <div class="controls">
-    <span class="filter-label">Filter:</span>
-    <button class="filter-btn active" data-filter="all">All</button>
-    <button class="filter-btn" data-filter="god-roll">★ God Rolls</button>
-    <button class="filter-btn" data-filter="close">~ Close</button>
-    <button class="filter-btn" data-filter="no">✗ No</button>
-    <button class="filter-btn" data-filter="curated">⚙ Curated</button>
-    <button class="filter-btn" data-filter="unknown">? Unknown</button>
-    <button class="filter-btn" data-filter="error">⚠ Error</button>
-    <button class="filter-btn" data-filter="pvp">PvP</button>
-    <button class="filter-btn" data-filter="pve">PvE</button>
-    <button class="filter-btn" data-filter="tag-favorite">⭐ Favorite</button>
-    <button class="filter-btn" data-filter="tag-keep">👍 Keep</button>
-    <button class="filter-btn" data-filter="tag-upgrade">⬆️ Upgrade</button>
-    <button class="filter-btn" data-filter="tag-evaluate">🔍 Evaluate</button>
-    <button class="filter-btn" data-filter="tag-junk">🗑️ Junk</button>
-    <button class="btn btn-sm" id="btn-refresh" style="margin-left:8px">↻ Refresh</button>
-    <div class="search-wrap">
-      <input type="text" id="search" placeholder="Search weapon name…">
+    <div class="controls-row">
+      <div class="filter-group">
+        <span class="filter-label">Result:</span>
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="god-roll">★ God Rolls</button>
+        <button class="filter-btn" data-filter="close">~ Close</button>
+        <button class="filter-btn" data-filter="no">✗ No</button>
+        <button class="filter-btn" data-filter="curated">⚙ Curated</button>
+        <button class="filter-btn" data-filter="unknown">? Unknown</button>
+        <button class="filter-btn" data-filter="error">⚠ Error</button>
+      </div>
+      <span class="controls-divider"></span>
+      <div class="filter-group">
+        <span class="filter-label">Mode:</span>
+        <button class="mode-filter-btn active" data-mode="all">Both</button>
+        <button class="mode-filter-btn" data-mode="pve">PvE</button>
+        <button class="mode-filter-btn" data-mode="pvp">PvP</button>
+      </div>
+      <span class="controls-divider"></span>
+      <div class="filter-group">
+        <span class="filter-label">Tag:</span>
+        <button class="tag-filter-btn active" data-tag="all">All</button>
+        <button class="tag-filter-btn" data-tag="none">🚫 Untagged</button>
+        <button class="tag-filter-btn" data-tag="favorite">⭐ Favorite</button>
+        <button class="tag-filter-btn" data-tag="keep">👍 Keep</button>
+        <button class="tag-filter-btn" data-tag="upgrade">⬆️ Upgrade</button>
+        <button class="tag-filter-btn" data-tag="evaluate">🔍 Evaluate</button>
+        <button class="tag-filter-btn" data-tag="infuse">🔺 Infuse</button>
+        <button class="tag-filter-btn" data-tag="junk">🗑️ Junk</button>
+        <button class="tag-filter-btn" data-tag="archive">📦 Archive</button>
+      </div>
     </div>
   </div>
 
@@ -479,6 +533,8 @@
 let RAW = [];
 let sortCol = 'result', sortDir = 1;
 let filterMode = 'all';
+let tagFilter  = 'all';
+let modeFilter = 'all';
 let searchTerm = '';
 const DAMAGE_CLASS = { 0:'kinetic', 1:'kinetic', 2:'arc', 3:'solar', 4:'void' };
 
@@ -527,6 +583,8 @@ async function checkAuth() {
   }
   document.getElementById('guardian-name').textContent = data.displayName ?? '';
   document.getElementById('btn-logout').style.display = 'inline-block';
+  document.getElementById('btn-refresh').style.display = 'inline-block';
+  document.getElementById('header-search').style.display = 'block';
   document.getElementById('header-sub').textContent =
     'DESTINY 1 // ' + (data.platform ?? '').toUpperCase() + ' // ' + (data.displayName ?? '').toUpperCase();
   return true;
@@ -628,6 +686,8 @@ function resultPill(result) {
 // ── Table ─────────────────────────────────────────────────────────────────────
 function getRows() {
   let rows = [...RAW];
+
+  // Result/mode filter
   if (filterMode === 'god-roll') rows = rows.filter(r => r.result.includes('GOD'));
   else if (filterMode === 'close')   rows = rows.filter(r => r.result.includes('Close'));
   else if (filterMode === 'no')      rows = rows.filter(r => r.result === '✗ No');
@@ -636,15 +696,27 @@ function getRows() {
   else if (filterMode === 'error')   rows = rows.filter(r => r.result.includes('Error'));
   else if (filterMode === 'pvp')     rows = rows.filter(r => r.mode === 'PvP');
   else if (filterMode === 'pve')     rows = rows.filter(r => r.mode === 'PvE');
-  else if (filterMode.startsWith('tag-')) {
-    const tagVal = filterMode.slice(4);
+
+  // Mode filter
+  if (modeFilter === 'pvp') rows = rows.filter(r => r.mode === 'PvP');
+  else if (modeFilter === 'pve') rows = rows.filter(r => r.mode === 'PvE');
+
+  // Tag filter — applied independently (AND with result filter)
+  if (tagFilter !== 'all') {
     const tags = loadTags();
-    rows = rows.filter(r => tags[r.instanceId] === tagVal);
+    if (tagFilter === 'none') {
+      rows = rows.filter(r => !tags[r.instanceId]);
+    } else {
+      rows = rows.filter(r => tags[r.instanceId] === tagFilter);
+    }
   }
+
+  // Search
   if (searchTerm) {
     const q = searchTerm.toLowerCase();
     rows = rows.filter(r => r.name.toLowerCase().includes(q) || r.type.toLowerCase().includes(q));
   }
+
   rows.sort((a, b) => {
     let av = a[sortCol] ?? '', bv = b[sortCol] ?? '';
     if (sortCol === 'result') { av = a.resultRank; bv = b.resultRank; }
@@ -763,6 +835,24 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     filterMode = btn.dataset.filter;
+    render();
+  });
+});
+
+document.querySelectorAll('.mode-filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    modeFilter = btn.dataset.mode;
+    render();
+  });
+});
+
+document.querySelectorAll('.tag-filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tag-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    tagFilter = btn.dataset.tag;
     render();
   });
 });
