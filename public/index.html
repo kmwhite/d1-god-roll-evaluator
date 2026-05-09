@@ -217,6 +217,9 @@
   tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
   tbody tr:hover { background: var(--surface); }
   tbody tr.pair-start { border-top: 2px solid var(--border-bright); }
+  tbody tr.pair-end { border-bottom: 2px solid var(--border-bright); }
+  /* Vertically centre the rowspan cells */
+  td[rowspan] { vertical-align: middle; }
   td { padding: 8px 12px; vertical-align: middle; }
 
   td.icon-cell { padding: 6px 10px; width: 56px; }
@@ -234,6 +237,8 @@
   .damage-dot.solar::before   { background: var(--solar); box-shadow: 0 0 6px var(--solar); }
   .damage-dot.void::before    { background: var(--void); box-shadow: 0 0 6px var(--void); }
   .mode-badge { font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: var(--text-dim); padding: 2px 6px; border: 1px solid var(--border); }
+  .mode-badge.mode-pve { color: #60a0e0; border-color: rgba(60,120,200,0.4); background: rgba(60,120,200,0.06); }
+  .mode-badge.mode-pvp { color: #e06060; border-color: rgba(200,80,80,0.4);  background: rgba(200,80,80,0.06);  }
   .light-val { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--amber-bright); display: block; text-align: center; }
   td.perk-cell { max-width: 260px; }
   .perk-hit { color: #6dbe8a; font-weight: 600; }
@@ -422,7 +427,7 @@
   <div class="stats-bar">
     <div class="stat"><span class="stat-value" id="stat-god">0</span><span class="stat-label">God Rolls</span></div>
     <div class="stat"><span class="stat-value" id="stat-close">0</span><span class="stat-label">Close</span></div>
-    <div class="stat"><span class="stat-value" id="stat-total">0</span><span class="stat-label">Total Shown</span></div>
+    <div class="stat"><span class="stat-value" id="stat-total">0</span><span class="stat-label">Weapons</span></div>
   </div>
 
   <div class="table-wrap">
@@ -481,8 +486,8 @@ const DAMAGE_CLASS = { 0:'kinetic', 1:'kinetic', 2:'arc', 3:'solar', 4:'void' };
 const TAGS = {
   favorite: { label: '⭐ Favorite', cls: 'tag-favorite' },
   keep:     { label: '👍 Keep',     cls: 'tag-keep'     },
-  upgrade:  { label: '⬆️  Upgrade',  cls: 'tag-upgrade'  },
-  evaluate: { label: '🔍 Evaluate', cls: 'tag-evaluate' },
+  upgrade:  { label: '⬆️ Upgrade',  cls: 'tag-upgrade'  },
+  evaluate: { label: '🔍 Evaluate', cls: 'tag-evaluate'  },
   infuse:   { label: '🔺 Infuse',   cls: 'tag-infuse'   },
   junk:     { label: '🗑️ Junk',     cls: 'tag-junk'     },
   archive:  { label: '📦 Archive',  cls: 'tag-archive'  },
@@ -652,61 +657,94 @@ function getRows() {
 function render() {
   const rows = getRows();
   const tbody = document.getElementById('tbody');
-  const seen = new Set();
-  let html = '';
+
+  // Group rows into weapon pairs: { pvp, pve, instanceId, ... }
+  // A pair may be missing one mode if filtered to PvP or PvE only.
+  const pairMap = new Map();
   for (const r of rows) {
-    const key = r.name + '|' + (r.instanceId ?? '');
-    const isPairStart = !seen.has(key);
-    seen.add(key);
-    let icon = r.icon
-      ? '<img class="weapon-icon" src="' + esc(r.icon) + '" alt="" loading="lazy" onerror="iconError(this)">'
-      : '<div class="weapon-icon-placeholder">⬡</div>';
-    const rarityClass = r.rarity.toLowerCase();
-    const damageClass = DAMAGE_CLASS[r.damageRaw] ?? r.damage.toLowerCase();
-    html += '<tr' + (isPairStart ? ' class="pair-start"' : '') + ' style="cursor:pointer"'
-      + ' data-instanceid="' + esc(r.instanceId ?? '') + '"'
-      + ' data-name="' + esc(r.name) + '"'
-      + ' data-icon="' + esc(r.icon ?? '') + '"'
-      + ' data-type="' + esc(r.type) + '"'
-      + ' data-rarity="' + esc(r.rarity) + '"'
-      + ' data-damage="' + esc(r.damage) + '"'
-      + ' data-damageraw="' + esc(String(r.damageRaw ?? 0)) + '"'
-      + ' data-light="' + esc(String(r.light ?? '')) + '">';
-    html += '<td class="icon-cell">' + icon + '</td>';
-    html += '<td class="name-cell">' + esc(r.name) + '</td>';
-    html += '<td>' + esc(r.type) + '</td>';
-    html += '<td><span class="badge ' + rarityClass + '">' + esc(r.rarity) + '</span></td>';
-    html += '<td><span class="damage-dot ' + damageClass + '">' + esc(r.damage) + '</span></td>';
-    html += '<td><span class="light-val">' + (r.light !== null ? r.light : '—') + '</span></td>';
-    html += '<td><span class="mode-badge">' + esc(r.mode) + '</span></td>';
-    html += '<td class="perk-cell">' + perkCell(r.col1) + '</td>';
-    html += '<td class="perk-cell">' + perkCell(r.col2) + '</td>';
-    html += '<td class="perk-cell">' + perkCell(r.col3) + '</td>';
-    html += '<td class="perk-cell">' + perkCell(r.col4) + '</td>';
-    html += '<td>' + resultPill(r.result) + '</td>';
-    // Tag cell — only on pair-start rows; PvE row gets an empty cell
-    if (isPairStart) {
-      const tag = getTag(r.instanceId);
-      const tagInfo = tag ? TAGS[tag] : null;
-      html += '<td class="tag-cell" data-iid="' + esc(r.instanceId ?? '') + '">';
-      html += '<span class="tag-pill ' + (tagInfo ? tagInfo.cls : '') + '" onclick="openTagDropdown(event,\'' + esc(r.instanceId ?? '') + '\')">';
-      html += tagInfo ? tagInfo.label : '+ Tag';
-      html += '</span>';
-      html += '<div class="tag-dropdown" id="td-' + esc(r.instanceId ?? '') + '">';
-      for (const [val, info] of Object.entries(TAGS)) {
-        html += '<button class="tag-option' + (tag === val ? ' active' : '') + '" onclick="setTag(event,\'' + esc(r.instanceId ?? '') + '\',\'' + val + '\')">' + info.label + '</button>';
-      }
-      html += '<button class="tag-option clear" onclick="setTag(event,\'' + esc(r.instanceId ?? '') + '\',null)">❌ Clear</button>';
-      html += '</div></td>';
-    } else {
-      html += '<td></td>';
-    }
-    html += '</tr>';
+    const key = r.instanceId ?? (r.name + '|' + r.mode);
+    if (!pairMap.has(key)) pairMap.set(key, {});
+    pairMap.get(key)[r.mode] = r;
   }
+  const pairs = [...pairMap.values()];
+
+  let html = '';
+  for (const pair of pairs) {
+    const pvp = pair['PvP'];
+    const pve = pair['PvE'];
+    const rep = pvp ?? pve; // representative row for shared cells
+    const iid = rep.instanceId ?? '';
+    const bothModes = !!(pvp && pve);
+    const rowspan = bothModes ? ' rowspan="2"' : '';
+
+    const icon = rep.icon
+      ? '<img class="weapon-icon" src="' + esc(rep.icon) + '" alt="" loading="lazy" onerror="iconError(this)">'
+      : '<div class="weapon-icon-placeholder">⬡</div>';
+    const rarityClass = rep.rarity.toLowerCase();
+    const damageClass = DAMAGE_CLASS[rep.damageRaw] ?? rep.damage.toLowerCase();
+
+    const tag     = getTag(iid);
+    const tagInfo = tag ? TAGS[tag] : null;
+    const tagCell = '<td class="tag-cell"' + rowspan + ' data-iid="' + esc(iid) + '">'
+      + '<span class="tag-pill ' + (tagInfo ? tagInfo.cls : '') + '" onclick="openTagDropdown(event,\'' + esc(iid) + '\')">'
+      + (tagInfo ? tagInfo.label : '+ Tag') + '</span>'
+      + '<div class="tag-dropdown" id="td-' + esc(iid) + '">'
+      + Object.entries(TAGS).map(([val, info]) =>
+          '<button class="tag-option' + (tag === val ? ' active' : '') + '" onclick="setTag(event,\'' + esc(iid) + '\',\'' + val + '\')">' + info.label + '</button>'
+        ).join('')
+      + '<button class="tag-option clear" onclick="setTag(event,\'' + esc(iid) + '\',null)">❌ Clear</button>'
+      + '</div></td>';
+
+    const sharedAttrs = ' style="cursor:pointer"'
+      + ' data-instanceid="' + esc(iid) + '"'
+      + ' data-name="' + esc(rep.name) + '"'
+      + ' data-icon="' + esc(rep.icon ?? '') + '"'
+      + ' data-type="' + esc(rep.type) + '"'
+      + ' data-rarity="' + esc(rep.rarity) + '"'
+      + ' data-damage="' + esc(rep.damage) + '"'
+      + ' data-damageraw="' + esc(String(rep.damageRaw ?? 0)) + '"'
+      + ' data-light="' + esc(String(rep.light ?? '')) + '"';
+
+    // Shared cells — only in first row, with rowspan if both modes present
+    const sharedCells =
+        '<td class="icon-cell"' + rowspan + '>' + icon + '</td>'
+      + '<td class="name-cell"' + rowspan + '>' + esc(rep.name) + '</td>'
+      + '<td' + rowspan + '>' + esc(rep.type) + '</td>'
+      + '<td' + rowspan + '><span class="badge ' + rarityClass + '">' + esc(rep.rarity) + '</span></td>'
+      + '<td' + rowspan + '><span class="damage-dot ' + damageClass + '">' + esc(rep.damage) + '</span></td>'
+      + '<td' + rowspan + '><span class="light-val">' + (rep.light !== null ? rep.light : '—') + '</span></td>';
+
+    // First row (PvE if available, else the single mode)
+    const firstRow = pve ?? pvp;
+    html += '<tr class="pair-start"' + sharedAttrs + '>';
+    html += sharedCells;
+    html += '<td><span class="mode-badge mode-' + firstRow.mode.toLowerCase() + '">' + esc(firstRow.mode) + '</span></td>';
+    html += '<td class="perk-cell">' + perkCell(firstRow.col1) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstRow.col2) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstRow.col3) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstRow.col4) + '</td>';
+    html += '<td>' + resultPill(firstRow.result) + '</td>';
+    html += tagCell;
+    html += '</tr>';
+
+    // Second row (PvP) — only if both modes present
+    if (bothModes) {
+      html += '<tr class="pair-end"' + sharedAttrs + '>';
+      html += '<td><span class="mode-badge mode-pvp">' + esc(pvp.mode) + '</span></td>';
+      html += '<td class="perk-cell">' + perkCell(pvp.col1) + '</td>';
+      html += '<td class="perk-cell">' + perkCell(pvp.col2) + '</td>';
+      html += '<td class="perk-cell">' + perkCell(pvp.col3) + '</td>';
+      html += '<td class="perk-cell">' + perkCell(pvp.col4) + '</td>';
+      html += '<td>' + resultPill(pvp.result) + '</td>';
+      html += '</tr>';
+    }
+  }
+
   tbody.innerHTML = html;
-  document.getElementById('stat-total').textContent = rows.length;
-  document.getElementById('stat-god').textContent   = rows.filter(r => r.result.includes('GOD')).length;
-  document.getElementById('stat-close').textContent = rows.filter(r => r.result.includes('Close')).length;
+  // Count weapons (pairs), not rows
+  document.getElementById('stat-total').textContent = pairs.length;
+  document.getElementById('stat-god').textContent   = pairs.filter(p => Object.values(p).some(r => r.result.includes('GOD'))).length;
+  document.getElementById('stat-close').textContent = pairs.filter(p => Object.values(p).some(r => r.result.includes('Close'))).length;
 }
 
 document.querySelectorAll('th[data-col]').forEach(th => {
