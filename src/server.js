@@ -23,9 +23,10 @@
 
 import express        from 'express';
 import session        from 'express-session';
+import FileStore      from 'session-file-store';
 import { fileURLToPath } from 'url';
 import path           from 'path';
-import crypto         from 'crypto';
+import { mkdirSync } from 'fs';
 
 import {
   resolveMembershipType,
@@ -51,7 +52,12 @@ const CLIENT_ID      = process.env.D1_GOD_ROLL_EVALUATOR_CLIENT_ID;
 const CLIENT_SECRET  = process.env.D1_GOD_ROLL_EVALUATOR_CLIENT_SECRET;
 const API_KEY        = process.env.D1_GOD_ROLL_EVALUATOR_API_KEY;
 const PORT           = parseInt(process.env.D1_GOD_ROLL_EVALUATOR_PORT ?? '3000', 10);
-const SESSION_SECRET = process.env.D1_GOD_ROLL_EVALUATOR_SESSION_SECRET ?? crypto.randomBytes(32).toString('hex');
+const SESSION_SECRET = process.env.D1_GOD_ROLL_EVALUATOR_SESSION_SECRET;
+if (!SESSION_SECRET) {
+  console.error('[server] Missing required env var: D1_GOD_ROLL_EVALUATOR_SESSION_SECRET');
+  console.error('         Generate one with: openssl rand -hex 32');
+  process.exit(1);
+}
 const REDIRECT_URI   = process.env.D1_GOD_ROLL_EVALUATOR_REDIRECT_URI ?? 'https://krypnos.net/callback';
 
 const REQUIRED = { PLATFORM, CLIENT_ID, CLIENT_SECRET, API_KEY };
@@ -209,7 +215,7 @@ function buildModalData(stub, itemData, talentGridMap) {
         if (!seen.has(opt.name)) { seen.add(opt.name); allOptions.push(opt); }
       }
       if (!allOptions.length) continue;
-      columns.push({ colIdx, options: allOptions, rolledName: allOptions.find(s => s.isRolled)?.name ?? '' });
+      columns.push({ colIndex: colIdx, options: allOptions, rolledName: allOptions.find(s => s.isRolled)?.name ?? '' });
     }
   }
 
@@ -363,17 +369,26 @@ async function requireAuth(req, res, next) {
 // ---------------------------------------------------------------------------
 
 const app = express();
+const SessionFileStore = FileStore(session);
+const SESSIONS_DIR = path.join(__dirname, '..', '.sessions');
+mkdirSync(SESSIONS_DIR, { recursive: true });
 
 // Trust the first proxy (nginx) so Express sees the correct protocol,
 // IP, and can set secure cookies even though it runs on plain HTTP.
 app.set('trust proxy', 1);
 
 app.use(session({
+  store: new SessionFileStore({
+    path:        SESSIONS_DIR,
+    ttl:         90 * 24 * 60 * 60, // 90 days in seconds — matches Bungie refresh token
+    retries:     1,
+    logFn:       () => {},           // suppress noisy file store logs
+  }),
   secret:            SESSION_SECRET,
   resave:            false,
   saveUninitialized: false,
   cookie: {
-    secure:   true,  // nginx terminates TLS; trust proxy makes this work
+    secure:   true,
     httpOnly: true,
     maxAge:   90 * 24 * 60 * 60 * 1000,
     sameSite: 'lax',
