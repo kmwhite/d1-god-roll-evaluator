@@ -81,20 +81,33 @@ export async function getMembershipId(membershipType, apiKey, accessToken, bungi
 }
 
 // ---------------------------------------------------------------------------
-// Manifest — SQLite download + caching
+// Manifest — SQLite download + in-memory cache
 // ---------------------------------------------------------------------------
+
+// Module-level cache — survives for the lifetime of the Node process.
+// Invalidated only when Bungie publishes a new manifest version.
+let _manifestCache   = null;
+let _manifestVersion = null;
 
 /**
  * Load all relevant manifest data from the cached D1 SQLite.
- * Downloads + caches the manifest if it's missing or outdated.
+ * Downloads + caches the manifest file if it's missing or outdated.
+ * Parses the SQLite and caches the result in memory — subsequent calls
+ * within the same process return instantly without any disk I/O.
  *
  * Returns:
- *   weaponHashes  Set<itemHash> — legendary+exotic weapons only (for vault filtering)
- *   itemDataMap   Map<itemHash, { name, tierType, itemTypeName, talentGridHash }>
+ *   weaponHashes  Set<itemHash>
+ *   itemDataMap   Map<itemHash, { name, tierType, itemTypeName, talentGridHash, icon, isCurated }>
  *   talentGridMap Map<talentGridHash, nodeDefinitions[]>
  */
 export async function buildManifestData(apiKey) {
-  await ensureManifestCurrent(apiKey);
+  const version = await ensureManifestCurrent(apiKey);
+
+  if (_manifestCache && _manifestVersion === version) {
+    return _manifestCache;
+  }
+
+  console.log('[bungie] Parsing manifest SQLite into memory...');
 
   const db            = new Database(MANIFEST_DB, { readonly: true, fileMustExist: true });
   const weaponHashes  = new Set(); // legendary+exotic weapon itemHashes
@@ -136,7 +149,10 @@ export async function buildManifestData(apiKey) {
     db.close();
   }
 
-  return { weaponHashes, itemDataMap, talentGridMap };
+  _manifestCache   = { weaponHashes, itemDataMap, talentGridMap };
+  _manifestVersion = version;
+  console.log('[bungie] Manifest cached in memory.');
+  return _manifestCache;
 }
 
 async function ensureManifestCurrent(apiKey) {
@@ -156,7 +172,7 @@ async function ensureManifestCurrent(apiKey) {
   if (existsSync(MANIFEST_META) && existsSync(MANIFEST_DB)) {
     try { cachedVersion = JSON.parse(readFileSync(MANIFEST_META, 'utf8')).version; } catch { /* miss */ }
   }
-  if (cachedVersion === version) return; // already up to date
+  if (cachedVersion === version) return version; // already up to date
 
   console.log(`[bungie] Manifest outdated (${cachedVersion ?? 'none'} → ${version}). Downloading...`);
   mkdirSync(CACHE_DIR, { recursive: true });
@@ -170,6 +186,7 @@ async function ensureManifestCurrent(apiKey) {
   writeFileSync(MANIFEST_DB, sqliteBuf);
   writeFileSync(MANIFEST_META, JSON.stringify({ version, contentPath }));
   console.log(`[bungie] Manifest cached (${sqliteBuf.length.toLocaleString()} bytes).`);
+  return version;
 }
 
 /**
