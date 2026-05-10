@@ -305,8 +305,11 @@ async function runEvaluation(bungieToken, bungieNetMembershipId, membershipTypeO
   const rows = [];
   for (const r of results) {
     for (const mode of ['PvP', 'PvE']) {
-      const rollDef    = mode === 'PvP' ? PVP[r.name] : PVE[r.name];
+      const rollEntry  = mode === 'PvP' ? PVP[r.name] : PVE[r.name];
       const evalResult = mode === 'PvP' ? r.evaluation.pvp : r.evaluation.pve;
+      const rollDef    = Array.isArray(rollEntry)
+        ? (rollEntry.find(d => d.source === evalResult.source) ?? rollEntry[0])
+        : rollEntry;
       const gridMap    = mapGodRollToGridColumns(rollDef, r.byColumn);
       const w          = col => rollDef ? (rollDef[col] ?? []) : null;
       const isError    = hasDefinitionError(rollDef, r.allPossible);
@@ -329,6 +332,7 @@ async function runEvaluation(bungieToken, bungieNetMembershipId, membershipTypeO
         col3:       curated ? '—' : colCell(w('col3'), r.byColumn, r.all, gridMap['col3'], r.allPossible),
         col4:       curated ? '—' : colCell(w('col4'), r.byColumn, r.all, gridMap['col4'], r.allPossible),
         result:     curated ? '⚙ Curated Roll' : result,
+        source:     curated ? null : (evalResult.source ?? null),
         resultRank: curated ? 4 : (RESULT_RANK[result] ?? 99),
         // Transfer metadata — only needed once per weapon, attach to PvP row
         ...(mode === 'PvP' ? {
@@ -446,8 +450,11 @@ async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap
         const modalData    = buildModalData(patchedStub, itemData, talentGridMap);
 
         for (const mode of ['PvP', 'PvE']) {
-          const rollDef    = mode === 'PvP' ? PVP[name] : PVE[name];
+          const rollEntry  = mode === 'PvP' ? PVP[name] : PVE[name];
           const evalResult = mode === 'PvP' ? evaluation.pvp : evaluation.pve;
+          const rollDef    = Array.isArray(rollEntry)
+            ? (rollEntry.find(d => d.source === evalResult.source) ?? rollEntry[0])
+            : rollEntry;
           const gridMap    = mapGodRollToGridColumns(rollDef, perks.byColumn);
           const w          = col => rollDef ? (rollDef[col] ?? []) : null;
           const isError    = hasDefinitionError(rollDef, allPossible);
@@ -470,6 +477,7 @@ async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap
             col3:       curated ? '—' : colCell(w('col3'), perks.byColumn, perks.all, gridMap['col3'], allPossible),
             col4:       curated ? '—' : colCell(w('col4'), perks.byColumn, perks.all, gridMap['col4'], allPossible),
             result:     curated ? '⚙ Curated Roll' : result,
+            source:     curated ? null : (evalResult.source ?? null),
             resultRank: curated ? 4 : (RESULT_RANK[result] ?? 99),
             modalData:  mode === 'PvP' ? modalData : undefined,
           });
