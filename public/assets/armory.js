@@ -403,6 +403,70 @@ function render() {
   }
 
   tbody.innerHTML = html;
+
+  // ── Mobile card view ──────────────────────────────────────────────────────
+  const cardsEl = document.getElementById('weapon-cards');
+  let cardHtml = '';
+  for (const pair of pairs) {
+    const pvp = pair['PvP'];
+    const pve = pair['PvE'];
+    const rep = pvp ?? pve;
+    const iid = rep.instanceId ?? '';
+    const tag = getTag(iid);
+    const tagInfo = tag ? TAGS[tag] : null;
+    const damageClass = DAMAGE_CLASS[rep.damageRaw] ?? rep.damage.toLowerCase();
+
+    const cardAttrs = ' data-instanceid="' + esc(iid) + '"'
+      + ' data-name="' + esc(rep.name) + '"'
+      + ' data-icon="' + esc(rep.icon ?? '') + '"'
+      + ' data-type="' + esc(rep.type) + '"'
+      + ' data-rarity="' + esc(rep.rarity) + '"'
+      + ' data-damage="' + esc(rep.damage) + '"'
+      + ' data-damageraw="' + esc(String(rep.damageRaw ?? 0)) + '"'
+      + ' data-light="' + esc(String(rep.light ?? '')) + '"';
+
+    cardHtml += '<div class="weapon-card"' + cardAttrs + '>';
+
+    // Icon
+    cardHtml += rep.icon
+      ? '<img class="weapon-card-icon" src="' + esc(rep.icon) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=\\\"weapon-card-icon-placeholder\\\">⬡</div>\'">'
+      : '<div class="weapon-card-icon-placeholder">⬡</div>';
+
+    // Body
+    cardHtml += '<div class="weapon-card-body">';
+    cardHtml += '<div class="weapon-card-name">' + esc(rep.name) + '</div>';
+    cardHtml += '<div class="weapon-card-meta">';
+    cardHtml += '<span class="badge ' + rep.rarity.toLowerCase() + '">' + esc(rep.rarity) + '</span>';
+    cardHtml += '<span class="damage-dot ' + damageClass + '">' + esc(rep.damage) + '</span>';
+    if (rep.light) cardHtml += '<span class="light-val" style="font-size:11px">⬡ ' + rep.light + '</span>';
+    cardHtml += '</div>';
+    cardHtml += '<div class="weapon-card-pills">';
+    if (pve) cardHtml += resultPill(pve.result).replace('result-pill', 'result-pill') + ' ';
+    if (pvp) cardHtml += resultPill(pvp.result);
+    cardHtml += '</div>';
+    cardHtml += '</div>';
+
+    // Tag indicator
+    if (tagInfo) {
+      cardHtml += '<span class="weapon-card-tag ' + tagInfo.cls + '">' + tagInfo.label + '</span>';
+    }
+
+    cardHtml += '</div>';
+  }
+  cardsEl.innerHTML = cardHtml;
+
+  // Wire card clicks to modal
+  cardsEl.querySelectorAll('.weapon-card').forEach(card => {
+    card.addEventListener('click', () => {
+      openModal(
+        card.dataset.instanceid, card.dataset.name, card.dataset.icon,
+        card.dataset.type, card.dataset.rarity, card.dataset.damage,
+        parseInt(card.dataset.damageraw ?? '0', 10),
+        card.dataset.light ? parseInt(card.dataset.light, 10) : null,
+      );
+    });
+  });
+
   // Count weapons (pairs), not rows
   document.getElementById('stat-total').textContent = pairs.length;
   document.getElementById('stat-god').textContent   = pairs.filter(p => Object.values(p).some(r => r.result.includes('GOD'))).length;

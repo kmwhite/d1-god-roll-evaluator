@@ -529,3 +529,139 @@ footer { padding: 24px 40px; border-top: 1px solid var(--border); font-family: '
 .god-roll-col-hit  { color: #6dbe8a; font-weight: 600; }
 .god-roll-col-miss { color: var(--text-dim); }
 .god-roll-col-na   { color: var(--border-bright); font-style: italic; }
+
+/* ── Mobile responsive ── */
+@media (max-width: 640px) {
+
+    /* Header */
+    header {
+        padding: 16px;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+    }
+    header h1 { font-size: 18px; letter-spacing: 0.08em; }
+    header p  { font-size: 10px; margin-top: 3px; }
+    .header-emblem { width: 40px; height: 40px; font-size: 20px; }
+    .header-right {
+        width: 100%; margin-left: 0;
+        flex-wrap: wrap; gap: 8px;
+    }
+    .guardian-name { width: 100%; font-size: 10px; }
+    #search { width: 100%; }
+    .search-wrap { width: 100%; margin-left: 0; }
+    .btn-sm { padding: 6px 10px; font-size: 11px; flex: 1; text-align: center; }
+
+    /* Controls */
+    .controls-row {
+        padding: 6px 12px;
+        gap: 4px;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+    }
+    .filter-group {
+        flex-shrink: 0;
+        padding: 4px 8px;
+    }
+    /* Hide verbose filter groups on mobile — keep Result, Mode, Tag */
+    .filter-group:nth-child(n+4) { display: none; }
+    .filter-label { display: none; }
+
+    /* Stats bar */
+    .stats-bar { padding: 8px 12px; gap: 16px; }
+
+    /* Hide the desktop table entirely on mobile */
+    .table-wrap { display: none; }
+    footer { padding: 16px; font-size: 9px; }
+
+    /* Tab bar */
+    .tab-bar { padding: 0 12px; }
+    .tab-btn { padding: 10px 16px; font-size: 13px; }
+
+    /* Vendor container */
+    #vendors-container { padding: 12px 12px 32px !important; }
+    .vendor-name { font-size: 15px; }
+
+    /* Modal — full screen */
+    .modal-backdrop { padding: 0; align-items: flex-end; }
+    .modal {
+        max-width: 100%;
+        max-height: 92vh;
+        border-bottom: none;
+        border-left: none;
+        border-right: none;
+    }
+    .modal-header { padding: 16px 16px 12px; }
+    .modal-icon, .modal-icon-placeholder { width: 52px; height: 52px; }
+    .modal-name { font-size: 17px; }
+    .modal-body { padding: 16px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .god-roll-eval { flex-direction: column; }
+    .god-roll-mode { min-width: 0; }
+    .perk-columns { gap: 8px; }
+    .perk-column { width: 120px; }
+    .manage-location-box { padding: 12px; }
+    .transfer-btn-emblem { min-width: 130px; }
+}
+
+/* ── Weapon cards (mobile table replacement) ── */
+#weapon-cards { display: none; padding: 0 12px 32px; }
+
+@media (max-width: 640px) {
+    #weapon-cards { display: block; }
+}
+
+.weapon-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.weapon-card:first-child { border-top: 2px solid var(--border-bright); }
+.weapon-card:hover { background: var(--surface); }
+.weapon-card-icon {
+    width: 44px; height: 44px; flex-shrink: 0;
+    object-fit: cover; border: 1px solid var(--border);
+    background: var(--surface2);
+}
+.weapon-card-icon-placeholder {
+    width: 44px; height: 44px; flex-shrink: 0;
+    background: var(--surface2); border: 1px solid var(--border);
+    display: grid; place-items: center;
+    font-size: 18px; color: var(--border-bright);
+}
+.weapon-card-body { flex: 1; min-width: 0; }
+.weapon-card-name {
+    font-size: 14px; font-weight: 700;
+    color: var(--text-bright); letter-spacing: 0.03em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.weapon-card-meta {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 3px; flex-wrap: wrap;
+}
+.weapon-card-type {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px; color: var(--text-dim);
+    letter-spacing: 0.08em; text-transform: uppercase;
+}
+.weapon-card-pills {
+    display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap;
+}
+.weapon-card-tag {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px; padding: 1px 6px;
+    border: 1px solid var(--border); color: var(--text-dim);
+    margin-left: auto; flex-shrink: 0; align-self: center;
+    white-space: nowrap;
+}
+.weapon-card-tag.tag-favorite { border-color: #c8922a; color: #e8a830; }
+.weapon-card-tag.tag-keep     { border-color: #4a8a5a; color: #6dbe8a; }
+.weapon-card-tag.tag-upgrade  { border-color: #4a7c9e; color: #7ab0d0; }
+.weapon-card-tag.tag-evaluate { border-color: #7b5ea7; color: #a888d0; }
+.weapon-card-tag.tag-infuse   { border-color: #5a8a8a; color: #80c0c0; }
+.weapon-card-tag.tag-junk     { border-color: #8a3a3a; color: #c06060; }
+.weapon-card-tag.tag-archive  { border-color: #5a5a6a; color: #9090a8; }
