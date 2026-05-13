@@ -1,196 +1,199 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>D1 God Roll Evaluator</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/armory.css">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D1 God Roll Evaluator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/armory.css">
+  </head>
+  <body>
 
-<header>
-  <div class="header-emblem">⬡</div>
-  <div>
-    <h1>God Roll Evaluator</h1>
-    <p id="header-sub">DESTINY 1 // WEAPON ANALYSIS</p>
-  </div>
-  <div class="header-right">
-    <span class="guardian-name" id="guardian-name"></span>
-    <select id="platform-select" style="display:none;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;padding:4px 8px;cursor:pointer;letter-spacing:0.06em"></select>
-    <div class="search-wrap" id="header-search" style="display:none">
-      <input type="text" id="search" placeholder="Search weapon name…">
+    <header>
+      <div class="header-emblem">⬡</div>
+      <div>
+        <h1>God Roll Evaluator</h1>
+        <p id="header-sub">DESTINY 1 // WEAPON ANALYSIS</p>
+      </div>
+      <div class="header-right">
+        <span class="guardian-name" id="guardian-name"></span>
+        <select id="platform-select" style="display:none;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;padding:4px 8px;cursor:pointer;letter-spacing:0.06em"></select>
+        <div class="search-wrap" id="header-search" style="display:none">
+          <input type="text" id="search" placeholder="Search weapon name…">
+        </div>
+        <button class="btn btn-sm" id="btn-refresh" style="display:none">↻ Refresh</button>
+        <button class="btn btn-sm" id="btn-export-tags" style="display:none">↓ Export Tags</button>
+        <button class="btn btn-sm" id="btn-import-tags" style="display:none">↑ Import Tags</button>
+        <input type="file" id="import-tags-input" accept=".json" style="display:none">
+        <button class="btn btn-sm" id="btn-logout" style="display:none">Log Out</button>
+      </div>
+    </header>
+
+    <!-- Landing (not authenticated) -->
+    <div id="landing">
+      <div class="landing-emblem">⬡</div>
+      <div class="landing-title">God Roll Evaluator</div>
+      <div class="landing-sub">Connect your Bungie account to evaluate your Destiny 1 weapons against community god roll definitions.</div>
+      <a class="btn btn-primary" href="/auth/login">Connect to Bungie.net</a>
     </div>
-    <button class="btn btn-sm" id="btn-refresh" style="display:none">↻ Refresh</button>
-    <button class="btn btn-sm" id="btn-logout" style="display:none">Log Out</button>
-  </div>
-</header>
 
-<!-- Landing (not authenticated) -->
-<div id="landing">
-  <div class="landing-emblem">⬡</div>
-  <div class="landing-title">God Roll Evaluator</div>
-  <div class="landing-sub">Connect your Bungie account to evaluate your Destiny 1 weapons against community god roll definitions.</div>
-  <a class="btn btn-primary" href="/auth/login">Connect to Bungie.net</a>
-</div>
+    <!-- Loading -->
+    <div id="loading-view">
+      <div class="spinner"></div>
+      <div class="loading-text">Evaluating your arsenal…</div>
+      <div id="loading-step">Loading manifest data</div>
+    </div>
 
-<!-- Loading -->
-<div id="loading-view">
-  <div class="spinner"></div>
-  <div class="loading-text">Evaluating your arsenal…</div>
-  <div id="loading-step">Loading manifest data</div>
-</div>
+    <!-- Error -->
+    <div id="error-view">
+      <div class="error-icon">⚠</div>
+      <div class="loading-text" id="error-msg">An error occurred.</div>
+      <button class="btn btn-primary" onclick="loadInventory()">Retry</button>
+    </div>
 
-<!-- Error -->
-<div id="error-view">
-  <div class="error-icon">⚠</div>
-  <div class="loading-text" id="error-msg">An error occurred.</div>
-  <button class="btn btn-primary" onclick="loadInventory()">Retry</button>
-</div>
+    <!-- App -->
+    <div id="app">
+      <!-- Tab bar -->
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="inventory">⬡ Inventory</button>
+        <button class="tab-btn" data-tab="vendors">🏪 Vendors</button>
+      </div>
 
-<!-- App -->
-<div id="app">
-  <!-- Tab bar -->
-  <div class="tab-bar">
-    <button class="tab-btn active" data-tab="inventory">⬡ Inventory</button>
-    <button class="tab-btn" data-tab="vendors">🏪 Vendors</button>
-  </div>
+      <!-- Inventory tab -->
+      <div class="tab-panel" id="tab-inventory">
+        <div class="controls">
+          <div class="controls-row" id="controls-row">
+            <div class="filter-group">
+              <span class="filter-label">Result:</span>
+              <button class="filter-btn active" data-filter="all">All</button>
+              <button class="filter-btn" data-filter="god-roll">★ God Rolls</button>
+              <button class="filter-btn" data-filter="close">~ Close</button>
+              <button class="filter-btn" data-filter="no">✗ No</button>
+              <button class="filter-btn" data-filter="curated">⚙ Curated</button>
+              <button class="filter-btn" data-filter="unknown">? Unknown</button>
+              <button class="filter-btn" data-filter="error">⚠ Error</button>
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">Mode:</span>
+              <button class="mode-filter-btn active" data-mode="all">Both</button>
+              <button class="mode-filter-btn" data-mode="pve">PvE</button>
+              <button class="mode-filter-btn" data-mode="pvp">PvP</button>
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">Tag:</span>
+              <button class="tag-filter-btn active" data-tag="all">All</button>
+              <button class="tag-filter-btn" data-tag="none">🚫 Untagged</button>
+              <button class="tag-filter-btn" data-tag="favorite">⭐ Favorite</button>
+              <button class="tag-filter-btn" data-tag="keep">👍 Keep</button>
+              <button class="tag-filter-btn" data-tag="upgrade">⬆️ Upgrade</button>
+              <button class="tag-filter-btn" data-tag="evaluate">🔍 Evaluate</button>
+              <button class="tag-filter-btn" data-tag="infuse">🔺 Infuse</button>
+              <button class="tag-filter-btn" data-tag="junk">🗑️ Junk</button>
+              <button class="tag-filter-btn" data-tag="archive">📦 Archive</button>
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">Slot:</span>
+              <button class="dyn-filter-btn active" data-dyn="slot" data-val="all">All</button>
+              <button class="dyn-filter-btn" data-dyn="slot" data-val="Primary">Primary</button>
+              <button class="dyn-filter-btn" data-dyn="slot" data-val="Special">Special</button>
+              <button class="dyn-filter-btn" data-dyn="slot" data-val="Heavy">Heavy</button>
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">Type:</span>
+              <button class="dyn-filter-btn active" data-dyn="type" data-val="all">All</button>
+              <button class="dyn-filter-btn" data-dyn="type" data-val="Auto Rifle">Auto Rifle</button>
+              <button class="dyn-filter-btn" data-dyn="type" data-val="Hand Cannon">Hand Cannon</button>
+              <button class="dyn-filter-btn" data-dyn="type" data-val="Pulse Rifle">Pulse Rifle</button>
+              <button class="dyn-filter-btn" data-dyn="type" data-val="Scout Rifle">Scout Rifle</button>
+              <button class="dyn-filter-btn" data-dyn="type" data-val="Sidearm">Sidearm</button>
+              <button class="dyn-filter-btn" data-dyn="type" data-val="Fusion Rifle">Fusion Rifle</button>
+              <button class="dyn-filter-btn" data-dyn="type" data-val="Shotgun">Shotgun</button>
+              <button class="dyn-filter-btn" data-dyn="type" data-val="Sniper Rifle">Sniper Rifle</button>
+              <button class="dyn-filter-btn" data-dyn="type" data-val="Machine Gun">Machine Gun</button>
+              <button class="dyn-filter-btn" data-dyn="type" data-val="Rocket Launcher">Rocket Launcher</button>
+              <button class="dyn-filter-btn" data-dyn="type" data-val="Sword">Sword</button>
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">Rarity:</span>
+              <button class="dyn-filter-btn active" data-dyn="rarity" data-val="all">All</button>
+              <button class="dyn-filter-btn" data-dyn="rarity" data-val="Exotic" data-rarity="Exotic">Exotic</button>
+              <button class="dyn-filter-btn" data-dyn="rarity" data-val="Legendary" data-rarity="Legendary">Legendary</button>
+              <button class="dyn-filter-btn" data-dyn="rarity" data-val="Rare" data-rarity="Rare">Rare</button>
+              <button class="dyn-filter-btn" data-dyn="rarity" data-val="Uncommon" data-rarity="Uncommon">Uncommon</button>
+              <button class="dyn-filter-btn" data-dyn="rarity" data-val="Common" data-rarity="Common">Common</button>
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">Damage:</span>
+              <button class="dyn-filter-btn active" data-dyn="damage" data-val="all">All</button>
+              <button class="dyn-filter-btn" data-dyn="damage" data-val="Kinetic"><span class="dmg-dot kinetic"></span>Kinetic</button>
+              <button class="dyn-filter-btn" data-dyn="damage" data-val="Solar"><span class="dmg-dot solar"></span>Solar</button>
+              <button class="dyn-filter-btn" data-dyn="damage" data-val="Arc"><span class="dmg-dot arc"></span>Arc</button>
+              <button class="dyn-filter-btn" data-dyn="damage" data-val="Void"><span class="dmg-dot void"></span>Void</button>
+            </div>
+          </div>
+        </div>
 
-  <!-- Inventory tab -->
-  <div class="tab-panel" id="tab-inventory">
-  <div class="controls">
-    <div class="controls-row" id="controls-row">
-      <div class="filter-group">
-        <span class="filter-label">Result:</span>
-        <button class="filter-btn active" data-filter="all">All</button>
-        <button class="filter-btn" data-filter="god-roll">★ God Rolls</button>
-        <button class="filter-btn" data-filter="close">~ Close</button>
-        <button class="filter-btn" data-filter="no">✗ No</button>
-        <button class="filter-btn" data-filter="curated">⚙ Curated</button>
-        <button class="filter-btn" data-filter="unknown">? Unknown</button>
-        <button class="filter-btn" data-filter="error">⚠ Error</button>
+        <div class="stats-bar">
+          <div class="stat"><span class="stat-value" id="stat-god">0</span><span class="stat-label">God Rolls</span></div>
+          <div class="stat"><span class="stat-value" id="stat-close">0</span><span class="stat-label">Close</span></div>
+          <div class="stat"><span class="stat-value" id="stat-total">0</span><span class="stat-label">Weapons</span></div>
+        </div>
+
+        <div class="table-wrap">
+          <table id="results-table">
+            <thead>
+              <tr>
+                <th class="no-sort">Icon</th>
+                <th data-col="name">Weapon</th>
+                <th data-col="type">Type</th>
+                <th data-col="rarity">Rarity</th>
+                <th data-col="damage">Damage</th>
+                <th data-col="light">Light</th>
+                <th data-col="mode">Mode</th>
+                <th data-col="col1">Column 1</th>
+                <th data-col="col2">Column 2</th>
+                <th data-col="col3">Column 3</th>
+                <th data-col="col4">Column 4</th>
+                <th data-col="result">Result</th>
+                <th data-col="tag">Tag</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+
+        <footer>GOD ROLL DEFINITIONS: TRUEGAMING.BOARDS.NET // D1-GOD-ROLL-EVALUATOR</footer>
+      </div><!-- end #tab-inventory -->
+
+      <!-- Vendors tab -->
+      <div class="tab-panel" id="tab-vendors" style="display:none">
+        <div id="vendors-container" style="padding:24px 40px 40px">
+          <!-- Populated by loadVendors() -->
+        </div>
       </div>
-      <div class="filter-group">
-        <span class="filter-label">Mode:</span>
-        <button class="mode-filter-btn active" data-mode="all">Both</button>
-        <button class="mode-filter-btn" data-mode="pve">PvE</button>
-        <button class="mode-filter-btn" data-mode="pvp">PvP</button>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Tag:</span>
-        <button class="tag-filter-btn active" data-tag="all">All</button>
-        <button class="tag-filter-btn" data-tag="none">🚫 Untagged</button>
-        <button class="tag-filter-btn" data-tag="favorite">⭐ Favorite</button>
-        <button class="tag-filter-btn" data-tag="keep">👍 Keep</button>
-        <button class="tag-filter-btn" data-tag="upgrade">⬆️ Upgrade</button>
-        <button class="tag-filter-btn" data-tag="evaluate">🔍 Evaluate</button>
-        <button class="tag-filter-btn" data-tag="infuse">🔺 Infuse</button>
-        <button class="tag-filter-btn" data-tag="junk">🗑️ Junk</button>
-        <button class="tag-filter-btn" data-tag="archive">📦 Archive</button>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Slot:</span>
-        <button class="dyn-filter-btn active" data-dyn="slot" data-val="all">All</button>
-        <button class="dyn-filter-btn" data-dyn="slot" data-val="Primary">Primary</button>
-        <button class="dyn-filter-btn" data-dyn="slot" data-val="Special">Special</button>
-        <button class="dyn-filter-btn" data-dyn="slot" data-val="Heavy">Heavy</button>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Type:</span>
-        <button class="dyn-filter-btn active" data-dyn="type" data-val="all">All</button>
-        <button class="dyn-filter-btn" data-dyn="type" data-val="Auto Rifle">Auto Rifle</button>
-        <button class="dyn-filter-btn" data-dyn="type" data-val="Hand Cannon">Hand Cannon</button>
-        <button class="dyn-filter-btn" data-dyn="type" data-val="Pulse Rifle">Pulse Rifle</button>
-        <button class="dyn-filter-btn" data-dyn="type" data-val="Scout Rifle">Scout Rifle</button>
-        <button class="dyn-filter-btn" data-dyn="type" data-val="Sidearm">Sidearm</button>
-        <button class="dyn-filter-btn" data-dyn="type" data-val="Fusion Rifle">Fusion Rifle</button>
-        <button class="dyn-filter-btn" data-dyn="type" data-val="Shotgun">Shotgun</button>
-        <button class="dyn-filter-btn" data-dyn="type" data-val="Sniper Rifle">Sniper Rifle</button>
-        <button class="dyn-filter-btn" data-dyn="type" data-val="Machine Gun">Machine Gun</button>
-        <button class="dyn-filter-btn" data-dyn="type" data-val="Rocket Launcher">Rocket Launcher</button>
-        <button class="dyn-filter-btn" data-dyn="type" data-val="Sword">Sword</button>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Rarity:</span>
-        <button class="dyn-filter-btn active" data-dyn="rarity" data-val="all">All</button>
-        <button class="dyn-filter-btn" data-dyn="rarity" data-val="Exotic" data-rarity="Exotic">Exotic</button>
-        <button class="dyn-filter-btn" data-dyn="rarity" data-val="Legendary" data-rarity="Legendary">Legendary</button>
-        <button class="dyn-filter-btn" data-dyn="rarity" data-val="Rare" data-rarity="Rare">Rare</button>
-        <button class="dyn-filter-btn" data-dyn="rarity" data-val="Uncommon" data-rarity="Uncommon">Uncommon</button>
-        <button class="dyn-filter-btn" data-dyn="rarity" data-val="Common" data-rarity="Common">Common</button>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Damage:</span>
-        <button class="dyn-filter-btn active" data-dyn="damage" data-val="all">All</button>
-        <button class="dyn-filter-btn" data-dyn="damage" data-val="Kinetic"><span class="dmg-dot kinetic"></span>Kinetic</button>
-        <button class="dyn-filter-btn" data-dyn="damage" data-val="Solar"><span class="dmg-dot solar"></span>Solar</button>
-        <button class="dyn-filter-btn" data-dyn="damage" data-val="Arc"><span class="dmg-dot arc"></span>Arc</button>
-        <button class="dyn-filter-btn" data-dyn="damage" data-val="Void"><span class="dmg-dot void"></span>Void</button>
+
+    </div>
+
+    <!-- Detail modal -->
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal-header">
+          <div id="modal-icon-wrap"></div>
+          <div class="modal-title-group">
+            <div class="modal-name" id="modal-name"></div>
+            <div class="modal-meta" id="modal-meta"></div>
+          </div>
+          <button class="modal-close" id="modal-close" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="modal-tag-section"></div>
+          <div id="modal-transfer-section"></div>
+          <div id="modal-content"></div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="stats-bar">
-    <div class="stat"><span class="stat-value" id="stat-god">0</span><span class="stat-label">God Rolls</span></div>
-    <div class="stat"><span class="stat-value" id="stat-close">0</span><span class="stat-label">Close</span></div>
-    <div class="stat"><span class="stat-value" id="stat-total">0</span><span class="stat-label">Weapons</span></div>
-  </div>
-
-  <div class="table-wrap">
-    <table id="results-table">
-      <thead>
-        <tr>
-          <th class="no-sort">Icon</th>
-          <th data-col="name">Weapon</th>
-          <th data-col="type">Type</th>
-          <th data-col="rarity">Rarity</th>
-          <th data-col="damage">Damage</th>
-          <th data-col="light">Light</th>
-          <th data-col="mode">Mode</th>
-          <th data-col="col1">Column 1</th>
-          <th data-col="col2">Column 2</th>
-          <th data-col="col3">Column 3</th>
-          <th data-col="col4">Column 4</th>
-          <th data-col="result">Result</th>
-          <th data-col="tag">Tag</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
-  </div>
-
-  <footer>GOD ROLL DEFINITIONS: TRUEGAMING.BOARDS.NET // D1-GOD-ROLL-EVALUATOR</footer>
-  </div><!-- end #tab-inventory -->
-
-  <!-- Vendors tab -->
-  <div class="tab-panel" id="tab-vendors" style="display:none">
-    <div id="vendors-container" style="padding:24px 40px 40px">
-      <!-- Populated by loadVendors() -->
-    </div>
-  </div>
-
-</div>
-
-<!-- Detail modal -->
-<div class="modal-backdrop" id="modal-backdrop">
-  <div class="modal" role="dialog" aria-modal="true">
-    <div class="modal-header">
-      <div id="modal-icon-wrap"></div>
-      <div class="modal-title-group">
-        <div class="modal-name" id="modal-name"></div>
-        <div class="modal-meta" id="modal-meta"></div>
-      </div>
-      <button class="modal-close" id="modal-close" aria-label="Close">✕</button>
-    </div>
-    <div class="modal-body">
-      <div id="modal-tag-section"></div>
-      <div id="modal-transfer-section"></div>
-      <div id="modal-content"></div>
-    </div>
-  </div>
-</div>
-
-<script src="/assets/armory.js"></script>
-</body>
+    <script src="/assets/armory.js"></script>
+  </body>
 </html>

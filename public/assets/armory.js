@@ -60,6 +60,8 @@ async function checkAuth() {
   document.getElementById('guardian-name').textContent = data.displayName ?? '';
   document.getElementById('btn-logout').style.display = 'inline-block';
   document.getElementById('btn-refresh').style.display = 'inline-block';
+  document.getElementById('btn-export-tags').style.display = 'inline-block';
+  document.getElementById('btn-import-tags').style.display = 'inline-block';
   document.getElementById('header-search').style.display = 'block';
   document.getElementById('header-sub').textContent =
     'DESTINY 1 // ' + (data.platform ?? '').toUpperCase() + ' // ' + (data.displayName ?? '').toUpperCase();
@@ -177,6 +179,45 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
   Object.keys(transferMeta).forEach(k => delete transferMeta[k]);
   slotFilter = typeFilter = rarityFilter = damageFilter = 'all';
   loadInventory();
+});
+
+document.getElementById('btn-export-tags').addEventListener('click', () => {
+  const tags = loadTags();
+  const json = JSON.stringify(tags, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'd1-armory-tags.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('btn-import-tags').addEventListener('click', () => {
+  document.getElementById('import-tags-input').click();
+});
+
+document.getElementById('import-tags-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const imported = JSON.parse(ev.target.result);
+      if (typeof imported !== 'object' || Array.isArray(imported)) {
+        alert('Invalid tag file — expected a JSON object.');
+        return;
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(imported));
+      render();
+    } catch {
+      alert('Failed to parse tag file — make sure it is valid JSON.');
+    } finally {
+      // Reset so the same file can be re-imported if needed
+      e.target.value = '';
+    }
+  };
+  reader.readAsText(file);
 });
 
 // ── Rendering helpers ─────────────────────────────────────────────────────────
