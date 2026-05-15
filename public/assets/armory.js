@@ -162,12 +162,19 @@ function stopLoadingAnimation() {
 }
 
 async function loadInventory() {
-  show('loading-view');
-  startLoadingAnimation();
+  // Show the app shell (tab bar + filters) immediately so the UI is never a blank page
+  show('app');
+  const loadingHtml = tabLoadingHtml('Evaluating your arsenal…');
+  document.getElementById('stat-total').textContent = '—';
+  document.getElementById('stat-god').textContent   = '—';
+  document.getElementById('stat-close').textContent = '—';
+  document.getElementById('tbody').innerHTML =
+    '<tr><td colspan="13">' + loadingHtml + '</td></tr>';
+  document.getElementById('weapon-cards').innerHTML = loadingHtml;
+  updateLayout();
   try {
     const res = await fetch('/api/inventory');
     const raw = await res.json();
-    stopLoadingAnimation();
     if (!raw.ok) throw new Error(raw.error ?? 'Unknown error');
     // Deep-clone via JSON round-trip to ensure all objects are in this page's
     // JS context — avoids Firefox XrayWrapper cross-origin object errors
@@ -176,11 +183,9 @@ async function loadInventory() {
     characters = data.characters ?? [];
     characterIds = data.characterIds ?? [];
     platformMembershipId = data.platformMembershipId ?? null;
-    // Build modal data map
     for (const r of RAW) {
       if (r.instanceId) {
         if (r.modalData) modalDataMap[r.instanceId] = r.modalData;
-        // Store transfer metadata keyed by instanceId
         if (r.itemHash !== undefined) {
           transferMeta[r.instanceId] = {
             itemHash:       r.itemHash,
@@ -191,11 +196,9 @@ async function loadInventory() {
         }
       }
     }
-    show('app');
     document.querySelector('th[data-col="result"]').classList.add('sort-asc');
     render();
   } catch (err) {
-    stopLoadingAnimation();
     document.getElementById('error-msg').textContent = 'Failed to load inventory: ' + err.message;
     show('error-view');
   }
@@ -259,6 +262,11 @@ function esc(s) {
 
 function iconError(el, cls) {
   el.outerHTML = '<div' + (cls ? ' class="' + cls + '"' : '') + '>⬡</div>';
+}
+
+function tabLoadingHtml(msg) {
+  return '<div class="tab-loading"><div class="spinner"></div>'
+    + '<div class="tab-loading-text">' + esc(msg) + '</div></div>';
 }
 
 function perkCell(val) {
@@ -959,7 +967,7 @@ let vendorRows_ = [];       // flat array of all vendor rows for modal god roll 
 
 async function loadVendors() {
   const container = document.getElementById('vendors-container');
-  container.innerHTML = '<div class="vendor-loading">Loading vendor inventories…</div>';
+  container.innerHTML = tabLoadingHtml('Loading vendor inventories…');
   try {
     const res  = await fetch('/api/vendors');
     const raw  = await res.json();
@@ -978,7 +986,7 @@ async function loadVendors() {
     renderVendors(data.sections);
     vendorsLoaded = true;
   } catch (err) {
-    container.innerHTML = '<div class="vendor-loading" style="color:#c06060">Failed to load vendors: ' + esc(err.message) + '</div>';
+    container.innerHTML = tabLoadingHtml('Failed to load vendors: ' + err.message);
   }
 }
 
@@ -1159,8 +1167,11 @@ function initArmorLocationFilters() {
 }
 
 async function loadArmor() {
-  const tbody = document.getElementById('armor-tbody');
-  tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--text-dim)">Loading armor…</td></tr>';
+  const loadingHtml = tabLoadingHtml('Loading armor…');
+  document.getElementById('armor-tbody').innerHTML =
+    '<tr><td colspan="11">' + loadingHtml + '</td></tr>';
+  document.getElementById('armor-cards').innerHTML = loadingHtml;
+  updateLayout();
   try {
     const res = await fetch('/api/armor');
     const raw = await res.json();
@@ -1170,7 +1181,9 @@ async function loadArmor() {
     initArmorLocationFilters();
     renderArmor();
   } catch (err) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:#c06060">Failed to load armor: ' + esc(err.message) + '</td></tr>';
+    const errHtml = tabLoadingHtml('Failed to load armor: ' + err.message);
+    document.getElementById('armor-tbody').innerHTML = '<tr><td colspan="11">' + errHtml + '</td></tr>';
+    document.getElementById('armor-cards').innerHTML = errHtml;
   }
 }
 
