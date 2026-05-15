@@ -51,6 +51,8 @@ import {
   getCharacters,
   getCharacterWeapons,
   getVaultWeapons,
+  getCharacterArmor,
+  getVaultArmor,
   extractPerkNames,
 } from './bungie.js';
 
@@ -94,6 +96,45 @@ const membershipType = resolveMembershipType(PLATFORM);
 const TIER_NAMES   = { 5: 'Legendary', 6: 'Exotic', 4: 'Rare', 3: 'Uncommon', 2: 'Common' };
 const DAMAGE_NAMES = { 0: 'Kinetic', 1: 'Kinetic', 2: 'Arc', 3: 'Solar', 4: 'Void' };
 const RESULT_RANK  = { '★ GOD ROLL': 0, '~ Close': 1, '✗ No': 2, '⚙ Curated Roll': 3, '⚠ Error': 4, '? —': 5 };
+
+const ARMOR_SLOT_NAMES = {
+  3448274439: 'Helmet',
+  3551918588: 'Gloves',
+  14239492:   'Chest',
+  20886954:   'Legs',
+  1585787867: 'Class Item',
+  434908299:  'Artifact',
+  4023194814: 'Ghost',
+};
+const ARMOR_CLASS_NAMES = { 0: 'Titan', 1: 'Hunter', 2: 'Warlock' };
+const ARMOR_BUCKET_SET = new Set(Object.keys(ARMOR_SLOT_NAMES).map(Number));
+
+// Maximum sum-of-two-stats for each armor slot — used for quality % calculation.
+// Source: https://l0r3.dev/page/Destiny-1-Maximum-Possible-Armor-Stats
+const ARMOR_MAX = {
+  'Helmet': 111, 'Gloves': 99, 'Chest': 147, 'Legs': 135,
+  'Class Item': 60, 'Ghost': 60, 'Artifact': 131,
+};
+
+function calcArmorQuality(intellect, discipline, strength, slot) {
+  const max = ARMOR_MAX[slot];
+  if (!max) return null;
+  const top2 = [intellect, discipline, strength]
+    .filter(v => typeof v === 'number' && v > 0)
+    .sort((a, b) => b - a)
+    .slice(0, 2);
+  return Math.floor(((top2[0] ?? 0) + (top2[1] ?? 0)) / max * 100);
+}
+
+function armorRank(quality) {
+  if (quality === null || quality === undefined) return '—';
+  if (quality >= 100) return 'S';
+  if (quality >= 95)  return 'A';
+  if (quality >= 90)  return 'B';
+  if (quality >= 80)  return 'C';
+  if (quality >= 70)  return 'D';
+  return 'F';
+}
 
 function mapGodRollToGridColumns(rollDef, byColumn) {
   const mapping = {};
@@ -349,6 +390,73 @@ async function runEvaluation(bungieToken, bungieNetMembershipId, membershipTypeO
   return { rows, characters, characterIds, platformMembershipId };
 }
 
+async function runArmorEvaluation(bungieToken, bungieNetMembershipId, membershipTypeOverride) {
+  const mt = membershipTypeOverride ?? membershipType;
+  const { armorHashes, armorDataMap, armorStatHashes } = await buildManifestData(API_KEY);
+  const platformMembershipId = await getMembershipId(mt, API_KEY, bungieToken, bungieNetMembershipId);
+  const characters = await getCharacters(mt, platformMembershipId, API_KEY, bungieToken);
+
+  const ih = armorStatHashes.intellect;
+  const dh = armorStatHashes.discipline;
+  const sh = armorStatHashes.strength;
+
+  function extractStats(stub) {
+    const arr = Array.isArray(stub.stats) ? stub.stats : Object.values(stub.stats ?? {});
+    return {
+      intellect:  arr.find(s => s.statHash === ih)?.value ?? 0,
+      discipline: arr.find(s => s.statHash === dh)?.value ?? 0,
+      strength:   arr.find(s => s.statHash === sh)?.value ?? 0,
+    };
+  }
+
+  function makeArmorRow(stub, itemData, location, characterId) {
+    const slot    = ARMOR_SLOT_NAMES[itemData.bucketTypeHash] ?? 'Unknown';
+    const { intellect, discipline, strength } = extractStats(stub);
+    const quality = calcArmorQuality(intellect, discipline, strength, slot);
+    return {
+      instanceId:   stub.itemInstanceId,
+      characterId:  characterId ?? null,
+      className:    ARMOR_CLASS_NAMES[itemData.classType] ?? null, // null = universal (Ghost, Artifact)
+      icon:         itemData.icon ? `https://www.bungie.net${itemData.icon}` : null,
+      name:         itemData.name,
+      type:         slot,
+      itemTypeName: itemData.itemTypeName,
+      rarity:       TIER_NAMES[itemData.tierType] ?? `Tier${itemData.tierType}`,
+      light:        stub.primaryStat?.value ?? null,
+      intellect, discipline, strength, quality,
+      rank:         armorRank(quality),
+      location,
+    };
+  }
+
+  const armorRows = [];
+
+  for (const char of characters) {
+    const stubs = await getCharacterArmor(mt, platformMembershipId, char.characterId, API_KEY, bungieToken);
+    for (const stub of stubs) {
+      const itemData = armorDataMap.get(stub.itemHash);
+      if (!itemData) continue;
+      armorRows.push(makeArmorRow(stub, itemData, 'character', char.characterId));
+    }
+  }
+
+  const vaultStubs = await getVaultArmor(mt, platformMembershipId, armorHashes, API_KEY, bungieToken);
+  for (const stub of vaultStubs) {
+    const itemData = armorDataMap.get(stub.itemHash);
+    if (!itemData) continue;
+    armorRows.push(makeArmorRow(stub, itemData, 'vault', null));
+  }
+
+  const rankOrder = { S: 0, A: 1, B: 2, C: 3, D: 4, F: 5, '—': 6 };
+  armorRows.sort((a, b) =>
+    (rankOrder[a.rank] ?? 9) - (rankOrder[b.rank] ?? 9) ||
+    (b.quality ?? 0) - (a.quality ?? 0) ||
+    a.name.localeCompare(b.name)
+  );
+
+  return armorRows;
+}
+
 // ---------------------------------------------------------------------------
 // Vendor pipeline
 // ---------------------------------------------------------------------------
@@ -375,7 +483,7 @@ const WEAPON_BUCKET_HASHES_ARRAY = [1498876634, 2465295065, 953998645];
 const WEAPON_BUCKET_SET = new Set(WEAPON_BUCKET_HASHES_ARRAY);
 const SLOT_NAMES_V = { 1498876634: 'Primary', 2465295065: 'Special', 953998645: 'Heavy' };
 
-async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap, itemDataMap, membershipTypeOverride) {
+async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap, itemDataMap, armorDataMap, armorStatHashes, membershipTypeOverride) {
   const mt = membershipTypeOverride ?? membershipType;
   const platformMembershipId = await getMembershipId(mt, API_KEY, bungieToken, bungieNetMembershipId);
 
@@ -485,7 +593,39 @@ async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap
       }
     }
 
-    vendorSections.push({ vendor, rows, available });
+    // Collect armor sale items
+    const armorRows = [];
+    if (available) {
+      const ih = armorStatHashes.intellect;
+      const dh = armorStatHashes.discipline;
+      const sh = armorStatHashes.strength;
+      for (const cat of vd?.saleItemCategories ?? []) {
+        for (const si of cat.saleItems ?? []) {
+          const stub = si.item;
+          if (!stub) continue;
+          const itemData = armorDataMap.get(stub.itemHash);
+          if (!itemData || !ARMOR_BUCKET_SET.has(itemData.bucketTypeHash ?? 0)) continue;
+          const slot        = ARMOR_SLOT_NAMES[itemData.bucketTypeHash] ?? 'Unknown';
+          const statsArr    = Array.isArray(stub.stats) ? stub.stats : Object.values(stub.stats ?? {});
+          const intellect   = statsArr.find(s => s.statHash === ih)?.value ?? 0;
+          const discipline  = statsArr.find(s => s.statHash === dh)?.value ?? 0;
+          const strength    = statsArr.find(s => s.statHash === sh)?.value ?? 0;
+          const quality     = calcArmorQuality(intellect, discipline, strength, slot);
+          armorRows.push({
+            instanceId:   `vendor-armor-${vendor.hash}-${stub.itemHash}`,
+            icon:         itemData.icon ? `https://www.bungie.net${itemData.icon}` : null,
+            name:         itemData.name,
+            type:         slot,
+            itemTypeName: itemData.itemTypeName,
+            rarity:       TIER_NAMES[itemData.tierType] ?? `Tier${itemData.tierType}`,
+            intellect, discipline, strength, quality,
+            rank:         armorRank(quality),
+          });
+        }
+      }
+    }
+
+    vendorSections.push({ vendor, rows, armorRows, available });
   }
 
   return vendorSections;
@@ -593,7 +733,6 @@ app.get('/callback', async (req, res) => {
   const { code } = req.query;
   console.log(`[callback] Received — code present: ${!!code}, protocol: ${req.protocol}, secure: ${req.secure}`);
   if (!code) return res.status(400).send('Missing code parameter');
-
   try {
     const body = new URLSearchParams({
       grant_type:    'authorization_code',
@@ -688,14 +827,26 @@ app.get('/api/inventory', requireAuth, async (req, res) => {
 
 app.get('/api/vendors', requireAuth, async (req, res) => {
   try {
-    const { weaponHashes, itemDataMap, talentGridMap } = await buildManifestData(API_KEY);
+    const { itemDataMap, talentGridMap, armorDataMap, armorStatHashes } = await buildManifestData(API_KEY);
     const sections = await buildVendorRows(
       req.token.access_token, req.token.membership_id,
-      talentGridMap, itemDataMap, req.membershipType
+      talentGridMap, itemDataMap, armorDataMap, armorStatHashes, req.membershipType
     );
     res.json({ ok: true, sections });
   } catch (err) {
     console.error('[api/vendors] Error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/armor', requireAuth, async (req, res) => {
+  try {
+    const armorRows = await runArmorEvaluation(
+      req.token.access_token, req.token.membership_id, req.membershipType
+    );
+    res.json({ ok: true, armorRows });
+  } catch (err) {
+    console.error('[api/armor] Error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });

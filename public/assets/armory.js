@@ -12,6 +12,31 @@ let typeFilter   = 'all'; // Sidearm, Rocket Launcher, etc.
 let rarityFilter = 'all';
 let damageFilter = 'all';
 let searchTerm   = '';
+
+let ARMOR_RAW            = [];
+let armorLoaded          = false;
+let armorClassFilter     = 'all';
+let armorTypeFilter      = 'all';
+let armorRankFilter      = 'all';
+let armorLocationFilter  = 'all';
+let armorSortCol         = 'rank';
+let armorSortDir         = 1;
+
+// Quality max per slot — source: https://l0r3.dev/page/Destiny-1-Maximum-Possible-Armor-Stats
+const ARMOR_MAX = {
+  'Helmet': 111, 'Gloves': 99, 'Chest': 147, 'Legs': 135,
+  'Class Item': 60, 'Ghost': 60, 'Artifact': 131,
+};
+
+function armorRank(quality) {
+  if (quality === null || quality === undefined) return '—';
+  if (quality >= 100) return 'S';
+  if (quality >= 95)  return 'A';
+  if (quality >= 90)  return 'B';
+  if (quality >= 80)  return 'C';
+  if (quality >= 70)  return 'D';
+  return 'F';
+}
 const DAMAGE_CLASS = { 0:'kinetic', 1:'kinetic', 2:'arc', 3:'solar', 4:'void' };
 
 // ── Tag system ────────────────────────────────────────────────────────────────
@@ -92,6 +117,8 @@ async function loadPlatforms(currentMembershipType) {
       });
       // Reset and reload inventory for the new platform
       RAW = [];
+      ARMOR_RAW = [];
+      armorLoaded = false;
       vendorRows_ = [];
       vendorsLoaded = false;
       Object.keys(modalDataMap).forEach(k => delete modalDataMap[k]);
@@ -175,6 +202,10 @@ async function loadInventory() {
 
 document.getElementById('btn-refresh').addEventListener('click', () => {
   RAW = [];
+  ARMOR_RAW = [];
+  armorLoaded = false;
+  vendorRows_ = [];
+  vendorsLoaded = false;
   Object.keys(modalDataMap).forEach(k => delete modalDataMap[k]);
   Object.keys(transferMeta).forEach(k => delete transferMeta[k]);
   slotFilter = typeFilter = rarityFilter = damageFilter = 'all';
@@ -884,7 +915,7 @@ document.getElementById('tbody').addEventListener('click', e => {
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 
-let activeTab = 'inventory';
+let activeTab = 'weapons';
 let vendorsLoaded = false;
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -896,6 +927,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
     document.getElementById('tab-' + tab).style.display = '';
     if (tab === 'vendors' && !vendorsLoaded) loadVendors();
+    if (tab === 'armor'   && !armorLoaded)   loadArmor();
   });
 });
 
@@ -946,6 +978,9 @@ function renderVendors(sections) {
       html += '<div class="vendor-empty">' + esc(msg) + '</div>';
     } else {
       html += renderVendorTable(section.rows, v);
+    }
+    if (section.armorRows && section.armorRows.length > 0) {
+      html += renderVendorArmorTable(section.armorRows);
     }
     html += '</div>';
   }
@@ -1046,6 +1081,137 @@ function renderVendorTable(rows, vendor) {
 
 function thStyle() {
   return 'padding:10px 12px;text-align:left;font-size:10px;font-family:Share Tech Mono,monospace;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-dim);white-space:nowrap;border-bottom:2px solid var(--amber)';
+}
+
+// ── Armor tab ─────────────────────────────────────────────────────────────────
+
+document.querySelectorAll('th[data-acol]').forEach(th => {
+  th.style.cursor = 'pointer';
+  th.addEventListener('click', () => {
+    const col = th.dataset.acol;
+    if (armorSortCol === col) {
+      armorSortDir *= -1;
+    } else {
+      armorSortCol = col;
+      armorSortDir = 1;
+    }
+    document.querySelectorAll('th[data-acol]').forEach(t => t.classList.remove('sort-asc', 'sort-desc'));
+    th.classList.add(armorSortDir === 1 ? 'sort-asc' : 'sort-desc');
+    renderArmor();
+  });
+});
+
+document.querySelectorAll('.armor-filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const group = btn.dataset.armor;
+    document.querySelectorAll(`.armor-filter-btn[data-armor="${group}"]`).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const val = btn.dataset.val;
+    if (group === 'class')    armorClassFilter    = val;
+    if (group === 'type')     armorTypeFilter     = val;
+    if (group === 'rank')     armorRankFilter     = val;
+    if (group === 'location') armorLocationFilter = val;
+    if (armorLoaded) renderArmor();
+  });
+});
+
+async function loadArmor() {
+  const tbody = document.getElementById('armor-tbody');
+  tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--text-dim)">Loading armor…</td></tr>';
+  try {
+    const res = await fetch('/api/armor');
+    const raw = await res.json();
+    if (!raw.ok) throw new Error(raw.error ?? 'Unknown error');
+    ARMOR_RAW = JSON.parse(JSON.stringify(raw.armorRows));
+    armorLoaded = true;
+    renderArmor();
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:#c06060">Failed to load armor: ' + esc(err.message) + '</td></tr>';
+  }
+}
+
+const ARMOR_RANK_ORDER = { S: 0, A: 1, B: 2, C: 3, D: 4, F: 5, '—': 6 };
+
+function getArmorRows() {
+  let rows = [...ARMOR_RAW];
+  // Universal items (className === null: Ghost, Artifact) appear under every class filter
+  if (armorClassFilter    !== 'all') rows = rows.filter(r => r.className === armorClassFilter || r.className === null);
+  if (armorTypeFilter     !== 'all') rows = rows.filter(r => r.type === armorTypeFilter);
+  if (armorRankFilter     !== 'all') rows = rows.filter(r => r.rank === armorRankFilter);
+  if (armorLocationFilter !== 'all') rows = rows.filter(r => r.location === armorLocationFilter);
+
+  rows.sort((a, b) => {
+    let av = a[armorSortCol] ?? '', bv = b[armorSortCol] ?? '';
+    if (armorSortCol === 'rank')    { av = ARMOR_RANK_ORDER[a.rank] ?? 9; bv = ARMOR_RANK_ORDER[b.rank] ?? 9; }
+    if (typeof av === 'number') return (av - bv) * armorSortDir;
+    return String(av).localeCompare(String(bv)) * armorSortDir;
+  });
+  return rows;
+}
+
+function renderArmor() {
+  const rows  = getArmorRows();
+  const tbody = document.getElementById('armor-tbody');
+
+  document.getElementById('armor-stat-total').textContent = rows.length;
+  document.getElementById('armor-stat-s').textContent = rows.filter(r => r.rank === 'S').length;
+  document.getElementById('armor-stat-a').textContent = rows.filter(r => r.rank === 'A').length;
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--text-dim)">No armor found.</td></tr>';
+    return;
+  }
+
+  let html = '';
+  for (const r of rows) {
+    const icon = r.icon
+      ? '<img class="weapon-icon" src="' + esc(r.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
+      : '<div class="weapon-icon-placeholder">⬡</div>';
+    const rankKey = r.rank === '—' ? 'none' : r.rank.toLowerCase();
+    html += '<tr>';
+    html += '<td class="icon-cell">' + icon + '</td>';
+    html += '<td class="name-cell">' + esc(r.name) + '</td>';
+    html += '<td>' + esc(r.type) + '</td>';
+    html += '<td>' + esc(r.className ?? 'Any') + '</td>';
+    html += '<td><span class="badge ' + (r.rarity ?? '').toLowerCase() + '">' + esc(r.rarity ?? '—') + '</span></td>';
+    html += '<td><span class="light-val">' + (r.light !== null ? r.light : '—') + '</span></td>';
+    html += '<td class="armor-stat-cell">' + (r.intellect  || '—') + '</td>';
+    html += '<td class="armor-stat-cell">' + (r.discipline || '—') + '</td>';
+    html += '<td class="armor-stat-cell">' + (r.strength   || '—') + '</td>';
+    html += '<td class="armor-stat-cell">' + (r.quality !== null ? r.quality + '%' : '—') + '</td>';
+    html += '<td><span class="rank-badge rank-' + rankKey + '">' + esc(r.rank) + '</span></td>';
+    html += '</tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+function renderVendorArmorTable(rows) {
+  let html = '<div class="table-wrap" style="padding:0;margin-top:8px"><table style="width:100%;border-collapse:collapse;font-size:13px">';
+  html += '<thead><tr>';
+  ['Icon', 'Armor', 'Type', 'Rarity', 'INT', 'DIS', 'STR', 'Quality', 'Rank'].forEach(h => {
+    html += '<th class="no-sort" style="' + thStyle() + '">' + h + '</th>';
+  });
+  html += '</tr></thead><tbody>';
+
+  for (const r of rows) {
+    const icon = r.icon
+      ? '<img class="weapon-icon" src="' + esc(r.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
+      : '<div class="weapon-icon-placeholder">⬡</div>';
+    const rankKey = r.rank === '—' ? 'none' : r.rank.toLowerCase();
+    html += '<tr>';
+    html += '<td class="icon-cell">' + icon + '</td>';
+    html += '<td class="name-cell">' + esc(r.name) + '</td>';
+    html += '<td>' + esc(r.type) + '</td>';
+    html += '<td><span class="badge ' + (r.rarity ?? '').toLowerCase() + '">' + esc(r.rarity ?? '—') + '</span></td>';
+    html += '<td class="armor-stat-cell">' + (r.intellect  || '—') + '</td>';
+    html += '<td class="armor-stat-cell">' + (r.discipline || '—') + '</td>';
+    html += '<td class="armor-stat-cell">' + (r.strength   || '—') + '</td>';
+    html += '<td class="armor-stat-cell">' + (r.quality !== null ? r.quality + '%' : '—') + '</td>';
+    html += '<td><span class="rank-badge rank-' + rankKey + '">' + esc(r.rank) + '</span></td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  return html;
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────

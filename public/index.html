@@ -56,12 +56,13 @@
     <div id="app">
       <!-- Tab bar -->
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="inventory">⬡ Inventory</button>
+        <button class="tab-btn active" data-tab="weapons">⬡ Weapons</button>
+        <button class="tab-btn" data-tab="armor">🛡 Armor</button>
         <button class="tab-btn" data-tab="vendors">🏪 Vendors</button>
       </div>
 
-      <!-- Inventory tab -->
-      <div class="tab-panel" id="tab-inventory">
+      <!-- Weapons tab -->
+      <div class="tab-panel" id="tab-weapons">
         <div class="controls">
           <div class="controls-row" id="controls-row">
             <div class="filter-group">
@@ -165,8 +166,76 @@
 
         <div id="weapon-cards"></div>
 
-        <footer>GOD ROLL DEFINITIONS: TRUEGAMING.BOARDS.NET // D1-GOD-ROLL-EVALUATOR</footer>
-      </div><!-- end #tab-inventory -->
+        <footer>GOD ROLL EVALUATOR // D1ARMORY.NET</footer>
+      </div><!-- end #tab-weapons -->
+
+      <!-- Armor tab -->
+      <div class="tab-panel" id="tab-armor" style="display:none">
+        <div class="controls">
+          <div class="controls-row" id="armor-controls-row">
+            <div class="filter-group">
+              <span class="filter-label">Class:</span>
+              <button class="armor-filter-btn active" data-armor="class" data-val="all">All</button>
+              <button class="armor-filter-btn" data-armor="class" data-val="Hunter">Hunter</button>
+              <button class="armor-filter-btn" data-armor="class" data-val="Warlock">Warlock</button>
+              <button class="armor-filter-btn" data-armor="class" data-val="Titan">Titan</button>
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">Type:</span>
+              <button class="armor-filter-btn active" data-armor="type" data-val="all">All</button>
+              <button class="armor-filter-btn" data-armor="type" data-val="Helmet">Helmet</button>
+              <button class="armor-filter-btn" data-armor="type" data-val="Gloves">Gloves</button>
+              <button class="armor-filter-btn" data-armor="type" data-val="Chest">Chest</button>
+              <button class="armor-filter-btn" data-armor="type" data-val="Legs">Legs</button>
+              <button class="armor-filter-btn" data-armor="type" data-val="Class Item">Class Item</button>
+              <button class="armor-filter-btn" data-armor="type" data-val="Ghost">Ghost</button>
+              <button class="armor-filter-btn" data-armor="type" data-val="Artifact">Artifact</button>
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">Location:</span>
+              <button class="armor-filter-btn active" data-armor="location" data-val="all">All</button>
+              <button class="armor-filter-btn" data-armor="location" data-val="character">Character</button>
+              <button class="armor-filter-btn" data-armor="location" data-val="vault">Vault</button>
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">Rank:</span>
+              <button class="armor-filter-btn active" data-armor="rank" data-val="all">All</button>
+              <button class="armor-filter-btn" data-armor="rank" data-val="S">S</button>
+              <button class="armor-filter-btn" data-armor="rank" data-val="A">A</button>
+              <button class="armor-filter-btn" data-armor="rank" data-val="B">B</button>
+              <button class="armor-filter-btn" data-armor="rank" data-val="C">C</button>
+              <button class="armor-filter-btn" data-armor="rank" data-val="D">D</button>
+              <button class="armor-filter-btn" data-armor="rank" data-val="F">F</button>
+            </div>
+          </div>
+        </div>
+        <div class="stats-bar">
+          <div class="stat"><span class="stat-value" id="armor-stat-s">0</span><span class="stat-label">S Rank</span></div>
+          <div class="stat"><span class="stat-value" id="armor-stat-a">0</span><span class="stat-label">A Rank</span></div>
+          <div class="stat"><span class="stat-value" id="armor-stat-total">0</span><span class="stat-label">Pieces</span></div>
+        </div>
+        <div class="table-wrap">
+          <table id="armor-table">
+            <thead>
+              <tr>
+                <th class="no-sort">Icon</th>
+                <th data-acol="name">Name</th>
+                <th data-acol="type">Type</th>
+                <th data-acol="className">Class</th>
+                <th data-acol="rarity">Rarity</th>
+                <th data-acol="light">Light</th>
+                <th data-acol="intellect">INT</th>
+                <th data-acol="discipline">DIS</th>
+                <th data-acol="strength">STR</th>
+                <th data-acol="quality">Quality</th>
+                <th data-acol="rank">Rank</th>
+              </tr>
+            </thead>
+            <tbody id="armor-tbody"></tbody>
+          </table>
+        </div>
+        <footer>QUALITY = FLOOR((STAT₁ + STAT₂) / MAX × 100) — SOURCE: L0R3.DEV</footer>
+      </div><!-- end #tab-armor -->
 
       <!-- Vendors tab -->
       <div class="tab-panel" id="tab-vendors" style="display:none">

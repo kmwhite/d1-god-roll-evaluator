@@ -28,6 +28,17 @@ const WEAPON_BUCKET_HASHES = new Set([
   953998645,  // Heavy Weapons
 ]);
 
+// D1 armor bucket hashes
+const ARMOR_BUCKET_HASHES = new Set([
+  3448274439, // Helmet
+  3551918588, // Gauntlets
+  14239492,   // Chest Armor
+  20886954,   // Leg Armor
+  1585787867, // Class Item
+  434908299,  // Artifact
+  4023194814, // Ghost Shell
+]);
+
 // ---------------------------------------------------------------------------
 // Core HTTP helper
 // ---------------------------------------------------------------------------
@@ -103,16 +114,19 @@ let _manifestVersion = null;
 export async function buildManifestData(apiKey) {
   const version = await ensureManifestCurrent(apiKey);
 
-  if (_manifestCache && _manifestVersion === version) {
+  if (_manifestCache?.armorHashes && _manifestVersion === version) {
     return _manifestCache;
   }
 
   console.log('[bungie] Parsing manifest SQLite into memory...');
 
-  const db            = new DatabaseSync(MANIFEST_DB, { readOnly: true });
-  const weaponHashes  = new Set(); // legendary+exotic weapon itemHashes
-  const itemDataMap   = new Map(); // itemHash → { name, tierType, itemTypeName, talentGridHash }
-  const talentGridMap = new Map(); // gridHash → nodes[]
+  const db             = new DatabaseSync(MANIFEST_DB, { readOnly: true });
+  const weaponHashes   = new Set();
+  const itemDataMap    = new Map(); // itemHash → { name, tierType, itemTypeName, talentGridHash, icon, isCurated }
+  const talentGridMap  = new Map(); // gridHash → nodes[]
+  const armorHashes    = new Set();
+  const armorDataMap   = new Map(); // itemHash → { name, tierType, itemTypeName, bucketTypeHash, icon }
+  const armorStatHashes = {};       // 'intellect'|'discipline'|'strength' → numeric statHash
 
   try {
     // Talent grid definitions — each node step carries nodeStepName directly
@@ -121,36 +135,56 @@ export async function buildManifestData(apiKey) {
       if (def.gridHash && def.nodes) talentGridMap.set(def.gridHash, def.nodes);
     }
 
-    // Item definitions — name, tier, type, grid hash; filter to weapon slots
-    // tierType: 6 = Exotic, 5 = Legendary
+    // Resolve armor ability stat hashes from the manifest to avoid hardcoding
+    for (const row of db.prepare('SELECT json FROM DestinyStatDefinition').all()) {
+      const def  = JSON.parse(row.json);
+      const name = (def.statName ?? '').toLowerCase();
+      if (name === 'intellect' || name === 'discipline' || name === 'strength') {
+        armorStatHashes[name] = def.statHash;
+      }
+    }
+
+    // Item definitions — weapons and armor, filtered by bucket hash
     for (const row of db.prepare('SELECT json FROM DestinyInventoryItemDefinition').all()) {
       const def = JSON.parse(row.json);
-      if (!def.itemHash || !WEAPON_BUCKET_HASHES.has(def.bucketTypeHash)) continue;
+      if (!def.itemHash) continue;
 
-      // Determine if this weapon has a curated (fixed) roll.
-      // Random-roll weapons have perk column nodes with many steps (5+).
-      // Curated/exotic weapons have every node at 1 step (sometimes 3 for
-      // the damage-type node). Threshold of >3 steps flags a random perk column.
-      const gridNodes = talentGridMap.get(def.talentGridHash) ?? [];
-      const maxSteps  = gridNodes.reduce((m, n) => Math.max(m, (n.steps ?? []).length), 0);
-      const isCurated = maxSteps <= 3;
+      if (WEAPON_BUCKET_HASHES.has(def.bucketTypeHash)) {
+        // Determine if this weapon has a curated (fixed) roll.
+        // Random-roll weapons have perk column nodes with many steps (5+).
+        // Curated/exotic weapons have every node at 1 step (sometimes 3 for
+        // the damage-type node). Threshold of >3 steps flags a random perk column.
+        const gridNodes = talentGridMap.get(def.talentGridHash) ?? [];
+        const maxSteps  = gridNodes.reduce((m, n) => Math.max(m, (n.steps ?? []).length), 0);
+        const isCurated = maxSteps <= 3;
 
-      itemDataMap.set(def.itemHash, {
-        name:           def.itemName ?? 'Unknown',
-        tierType:       def.tierType ?? 0,
-        itemTypeName:   def.itemTypeName ?? '',
-        talentGridHash: def.talentGridHash ?? null,
-        bucketTypeHash: def.bucketTypeHash ?? null,
-        icon:           def.icon ?? null,
-        isCurated,
-      });
-      weaponHashes.add(def.itemHash);
+        itemDataMap.set(def.itemHash, {
+          name:           def.itemName ?? 'Unknown',
+          tierType:       def.tierType ?? 0,
+          itemTypeName:   def.itemTypeName ?? '',
+          talentGridHash: def.talentGridHash ?? null,
+          bucketTypeHash: def.bucketTypeHash ?? null,
+          icon:           def.icon ?? null,
+          isCurated,
+        });
+        weaponHashes.add(def.itemHash);
+      } else if (ARMOR_BUCKET_HASHES.has(def.bucketTypeHash)) {
+        armorDataMap.set(def.itemHash, {
+          name:           def.itemName ?? 'Unknown',
+          tierType:       def.tierType ?? 0,
+          itemTypeName:   def.itemTypeName ?? '',
+          bucketTypeHash: def.bucketTypeHash,
+          classType:      def.classType ?? 3, // 0=Titan, 1=Hunter, 2=Warlock, 3=Universal
+          icon:           def.icon ?? null,
+        });
+        armorHashes.add(def.itemHash);
+      }
     }
   } finally {
     db.close();
   }
 
-  _manifestCache   = { weaponHashes, itemDataMap, talentGridMap };
+  _manifestCache   = { weaponHashes, itemDataMap, talentGridMap, armorHashes, armorDataMap, armorStatHashes };
   _manifestVersion = version;
   console.log('[bungie] Manifest cached in memory.');
   return _manifestCache;
@@ -294,6 +328,39 @@ export async function getVaultWeapons(membershipType, membershipId, weaponHashes
       (bucket.items ?? []).map((item) => ({ ...item, bucketHash: bucket.bucketHash, characterId: null }))
     )
     .filter((item) => weaponHashes.has(item.itemHash));
+}
+
+/**
+ * Fetch armor item stubs from a character's inventory.
+ */
+export async function getCharacterArmor(membershipType, membershipId, characterId, apiKey, accessToken) {
+  const data = await bungieGet(
+    `/Destiny/${membershipType}/Account/${membershipId}/Character/${characterId}/Inventory/`,
+    apiKey, accessToken
+  );
+  const equippable = data.data?.buckets?.Equippable ?? [];
+  return equippable
+    .filter((bucket) => ARMOR_BUCKET_HASHES.has(bucket.bucketHash))
+    .flatMap((bucket) =>
+      (bucket.items ?? []).map((item) => ({ ...item, bucketHash: bucket.bucketHash, characterId }))
+    );
+}
+
+/**
+ * Fetch armor item stubs from the vault.
+ * Vault buckets use vault-section hashes, so we match by itemHash against the armor manifest set.
+ */
+export async function getVaultArmor(membershipType, membershipId, armorHashes, apiKey, accessToken) {
+  const data = await bungieGet(
+    `/Destiny/${membershipType}/MyAccount/Vault/?accountId=${membershipId}`,
+    apiKey, accessToken
+  );
+  const buckets = data.data?.buckets ?? [];
+  return buckets
+    .flatMap((bucket) =>
+      (bucket.items ?? []).map((item) => ({ ...item, bucketHash: bucket.bucketHash, characterId: null }))
+    )
+    .filter((item) => armorHashes.has(item.itemHash));
 }
 
 /**

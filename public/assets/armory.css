@@ -200,6 +200,31 @@ header p {
 .mode-filter-btn.active[data-mode="pvp"] { background: rgba(200,80,80,0.08); border-color: rgba(200,80,80,0.5); color: #e06060; }
 .mode-filter-btn.active[data-mode="pve"] { background: rgba(60,120,200,0.08); border-color: rgba(60,120,200,0.5); color: #60a0e0; }
 
+/* Armor filter buttons — same base style as filter-btn */
+.armor-filter-btn {
+    padding: 3px 10px; background: var(--surface2);
+    border: 1px solid var(--border); color: var(--text-dim);
+    font-family: 'Rajdhani', sans-serif; font-size: 12px;
+    font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; cursor: pointer; transition: all 0.15s;
+}
+.armor-filter-btn:hover  { border-color: var(--border-bright); color: var(--text); }
+.armor-filter-btn.active { background: var(--amber-glow); border-color: var(--amber); color: var(--amber-bright); }
+
+/* Rank filter buttons: tinted color at rest, rank badge style when active */
+.armor-filter-btn[data-armor="rank"][data-val="S"] { color: rgba(109,190,138,0.6); }
+.armor-filter-btn[data-armor="rank"][data-val="A"] { color: rgba(170,208,80,0.6);  }
+.armor-filter-btn[data-armor="rank"][data-val="B"] { color: rgba(224,208,80,0.6);  }
+.armor-filter-btn[data-armor="rank"][data-val="C"] { color: rgba(224,152,64,0.6);  }
+.armor-filter-btn[data-armor="rank"][data-val="D"] { color: rgba(208,112,80,0.6);  }
+.armor-filter-btn[data-armor="rank"][data-val="F"] { color: rgba(192,80,80,0.6);   }
+.armor-filter-btn[data-armor="rank"][data-val="S"].active { background: rgba(60,180,80,0.15);  border-color: #3a9a50; color: #6dbe8a; }
+.armor-filter-btn[data-armor="rank"][data-val="A"].active { background: rgba(140,200,60,0.12); border-color: #7aaa30; color: #aad050; }
+.armor-filter-btn[data-armor="rank"][data-val="B"].active { background: rgba(200,190,40,0.15); border-color: #c8b828; color: #e0d050; }
+.armor-filter-btn[data-armor="rank"][data-val="C"].active { background: rgba(220,130,40,0.15); border-color: #c07828; color: #e09840; }
+.armor-filter-btn[data-armor="rank"][data-val="D"].active { background: rgba(200,80,40,0.15);  border-color: #b04828; color: #d07050; }
+.armor-filter-btn[data-armor="rank"][data-val="F"].active { background: rgba(180,40,40,0.15);  border-color: #9a2828; color: #c05050; }
+
 /* Dynamic filter buttons — share base style with filter-btn */
 .dyn-filter-btn {
     padding: 3px 10px; background: var(--surface2);
@@ -319,6 +344,17 @@ td.perk-cell { max-width: 260px; }
 .result-pill.unknown { background: transparent; border: 1px solid var(--border); color: var(--border-bright); font-style: italic; }
 .result-pill.curated { background: rgba(120,160,120,0.08); border: 1px solid #5a8a6a; color: #8ab898; font-style: italic; }
 .result-pill.error { background: rgba(180,120,40,0.12); border: 1px solid #b07828; color: #d09840; }
+
+/* ── Armor rank badges ── */
+.rank-badge { display: inline-block; min-width: 26px; padding: 2px 7px; font-family: 'Share Tech Mono', monospace; font-size: 12px; font-weight: 700; text-align: center; letter-spacing: 0.06em; }
+.rank-badge.rank-s    { background: rgba(60,180,80,0.15);   border: 1px solid #3a9a50; color: #6dbe8a; }
+.rank-badge.rank-a    { background: rgba(140,200,60,0.12);  border: 1px solid #7aaa30; color: #aad050; }
+.rank-badge.rank-b    { background: rgba(200,190,40,0.15);  border: 1px solid #c8b828; color: #e0d050; }
+.rank-badge.rank-c    { background: rgba(220,130,40,0.15);  border: 1px solid #c07828; color: #e09840; }
+.rank-badge.rank-d    { background: rgba(200,80,40,0.15);   border: 1px solid #b04828; color: #d07050; }
+.rank-badge.rank-f    { background: rgba(180,40,40,0.15);   border: 1px solid #9a2828; color: #c05050; }
+.rank-badge.rank-none { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
+.armor-stat-cell { font-family: 'Share Tech Mono', monospace; font-size: 12px; text-align: right; padding-right: 14px; color: var(--text); }
 
 /* ── Tags ── */
 .tag-cell { position: relative; white-space: nowrap; }
