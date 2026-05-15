@@ -1149,6 +1149,14 @@ function getArmorRows() {
   return rows;
 }
 
+function updateArmorLayout() {
+  const isMobile  = window.innerWidth <= 640;
+  const cards     = document.getElementById('armor-cards');
+  const tableWrap = document.querySelector('#tab-armor .table-wrap');
+  if (cards)     cards.style.display     = isMobile ? 'block' : 'none';
+  if (tableWrap) tableWrap.style.display = isMobile ? 'none'  : '';
+}
+
 function renderArmor() {
   const rows  = getArmorRows();
   const tbody = document.getElementById('armor-tbody');
@@ -1159,30 +1167,80 @@ function renderArmor() {
 
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--text-dim)">No armor found.</td></tr>';
+    document.getElementById('armor-cards').innerHTML = '';
+    updateArmorLayout();
     return;
   }
 
-  let html = '';
+  // ── Table rows ────────────────────────────────────────────────────────────
+  let tableHtml = '';
   for (const r of rows) {
     const icon = r.icon
       ? '<img class="weapon-icon" src="' + esc(r.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
       : '<div class="weapon-icon-placeholder">⬡</div>';
     const rankKey = r.rank === '—' ? 'none' : r.rank.toLowerCase();
-    html += '<tr>';
-    html += '<td class="icon-cell">' + icon + '</td>';
-    html += '<td class="name-cell">' + esc(r.name) + '</td>';
-    html += '<td>' + esc(r.type) + '</td>';
-    html += '<td>' + esc(r.className ?? 'Any') + '</td>';
-    html += '<td><span class="badge ' + (r.rarity ?? '').toLowerCase() + '">' + esc(r.rarity ?? '—') + '</span></td>';
-    html += '<td><span class="light-val">' + (r.light !== null ? r.light : '—') + '</span></td>';
-    html += '<td class="armor-stat-cell">' + (r.intellect  || '—') + '</td>';
-    html += '<td class="armor-stat-cell">' + (r.discipline || '—') + '</td>';
-    html += '<td class="armor-stat-cell">' + (r.strength   || '—') + '</td>';
-    html += '<td class="armor-stat-cell">' + (r.quality !== null ? r.quality + '%' : '—') + '</td>';
-    html += '<td><span class="rank-badge rank-' + rankKey + '">' + esc(r.rank) + '</span></td>';
-    html += '</tr>';
+    tableHtml += '<tr>';
+    tableHtml += '<td class="icon-cell">' + icon + '</td>';
+    tableHtml += '<td class="name-cell">' + esc(r.name) + '</td>';
+    tableHtml += '<td>' + esc(r.type) + '</td>';
+    tableHtml += '<td>' + esc(r.className ?? 'Any') + '</td>';
+    tableHtml += '<td><span class="badge ' + (r.rarity ?? '').toLowerCase() + '">' + esc(r.rarity ?? '—') + '</span></td>';
+    tableHtml += '<td><span class="light-val">' + (r.light !== null ? r.light : '—') + '</span></td>';
+    tableHtml += '<td class="armor-stat-cell">' + (r.intellect  || '—') + '</td>';
+    tableHtml += '<td class="armor-stat-cell">' + (r.discipline || '—') + '</td>';
+    tableHtml += '<td class="armor-stat-cell">' + (r.strength   || '—') + '</td>';
+    tableHtml += '<td class="armor-stat-cell">' + (r.quality !== null ? r.quality + '%' : '—') + '</td>';
+    tableHtml += '<td><span class="rank-badge rank-' + rankKey + '">' + esc(r.rank) + '</span></td>';
+    tableHtml += '</tr>';
   }
-  tbody.innerHTML = html;
+  tbody.innerHTML = tableHtml;
+
+  // ── Mobile cards ──────────────────────────────────────────────────────────
+  const cardsEl = document.getElementById('armor-cards');
+  let cardHtml = '';
+  for (const r of rows) {
+    const rankKey  = r.rank === '—' ? 'none' : r.rank.toLowerCase();
+    const locClass = r.location === 'vault' ? 'loc-vault' : '';
+
+    const icon = r.icon
+      ? '<img class="weapon-icon" src="' + esc(r.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
+      : '<div class="weapon-icon-placeholder">⬡</div>';
+
+    const subtypeText = r.type + (r.className ? ' · ' + r.className : '');
+    const lightText   = r.light !== null ? ' · ⬡ ' + r.light : '';
+
+    cardHtml += '<div class="armor-card">';
+    cardHtml += icon;
+    cardHtml += '<div class="armor-card-body">';
+
+    // Header: name + rank badge
+    cardHtml += '<div class="armor-card-header">';
+    cardHtml += '<span class="armor-card-name">' + esc(r.name) + '</span>';
+    cardHtml += '<span class="rank-badge rank-' + rankKey + '">' + esc(r.rank) + '</span>';
+    cardHtml += '</div>';
+
+    // Meta: rarity badge + type·class + light + location
+    cardHtml += '<div class="armor-card-meta">';
+    cardHtml += '<span class="badge ' + (r.rarity ?? '').toLowerCase() + '">' + esc(r.rarity ?? '—') + '</span>';
+    cardHtml += '<span class="armor-card-subtype">' + esc(subtypeText + lightText) + '</span>';
+    cardHtml += '<span class="armor-card-location ' + locClass + '">' + esc(r.location) + '</span>';
+    cardHtml += '</div>';
+
+    // Stats row
+    cardHtml += '<div class="armor-card-stats">';
+    cardHtml += '<span class="armor-card-stat">INT <b>' + (r.intellect  || '—') + '</b></span>';
+    cardHtml += '<span class="armor-card-stat">DIS <b>' + (r.discipline || '—') + '</b></span>';
+    cardHtml += '<span class="armor-card-stat">STR <b>' + (r.strength   || '—') + '</b></span>';
+    if (r.quality !== null) {
+      cardHtml += '<span class="armor-card-quality">' + r.quality + '%</span>';
+    }
+    cardHtml += '</div>';
+
+    cardHtml += '</div>';
+    cardHtml += '</div>';
+  }
+  cardsEl.innerHTML = cardHtml;
+  updateArmorLayout();
 }
 
 function renderVendorArmorTable(rows) {
@@ -1213,6 +1271,10 @@ function renderVendorArmorTable(rows) {
   html += '</tbody></table></div>';
   return html;
 }
+
+window.addEventListener('resize', () => {
+  if (armorLoaded) updateArmorLayout();
+});
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 (async () => {

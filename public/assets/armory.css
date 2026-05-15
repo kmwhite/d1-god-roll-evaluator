@@ -354,7 +354,7 @@ td.perk-cell { max-width: 260px; }
 .rank-badge.rank-d    { background: rgba(200,80,40,0.15);   border: 1px solid #b04828; color: #d07050; }
 .rank-badge.rank-f    { background: rgba(180,40,40,0.15);   border: 1px solid #9a2828; color: #c05050; }
 .rank-badge.rank-none { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
-.armor-stat-cell { font-family: 'Share Tech Mono', monospace; font-size: 12px; text-align: right; padding-right: 14px; color: var(--text); }
+.armor-stat-cell { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--text); }
 
 /* ── Tags ── */
 .tag-cell { position: relative; white-space: nowrap; }
@@ -640,11 +640,11 @@ footer { padding: 24px 40px; border-top: 1px solid var(--border); font-family: '
     .transfer-btn-emblem { min-width: 130px; }
 }
 
-/* ── Weapon cards (mobile table replacement) ── */
-#weapon-cards { display: none; padding: 0 12px 32px; }
+/* ── Weapon/armor cards (mobile table replacement) ── */
+#weapon-cards, #armor-cards { display: none; padding: 0 12px 32px; }
 
 @media (max-width: 640px) {
-    #weapon-cards { display: block; }
+    #weapon-cards, #armor-cards { display: block; }
 }
 
 .weapon-card {
@@ -701,3 +701,54 @@ footer { padding: 24px 40px; border-top: 1px solid var(--border); font-family: '
 .weapon-card-tag.tag-infuse   { border-color: #5a8a8a; color: #80c0c0; }
 .weapon-card-tag.tag-junk     { border-color: #8a3a3a; color: #c06060; }
 .weapon-card-tag.tag-archive  { border-color: #5a5a6a; color: #9090a8; }
+
+.armor-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+}
+.armor-card:first-child { border-top: 2px solid var(--border-bright); }
+.armor-card:hover { background: var(--surface); }
+.armor-card-body { flex: 1; min-width: 0; }
+.armor-card-header {
+    display: flex; align-items: baseline;
+    justify-content: space-between; gap: 8px;
+}
+.armor-card-name {
+    font-size: 14px; font-weight: 700;
+    color: var(--text-bright); letter-spacing: 0.03em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    flex: 1; min-width: 0;
+}
+.armor-card-meta {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 3px; flex-wrap: wrap;
+}
+.armor-card-subtype {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px; color: var(--text-dim);
+    letter-spacing: 0.08em; text-transform: uppercase;
+}
+.armor-card-location {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px; padding: 1px 5px;
+    border: 1px solid var(--border); color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.06em;
+}
+.armor-card-location.loc-vault { border-color: rgba(122,170,200,0.4); color: #7ab0d0; }
+.armor-card-stats {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 5px; flex-wrap: wrap;
+}
+.armor-card-stat {
+    font-family: 'Share Tech Mono', monospace; font-size: 10px;
+    color: var(--text-dim);
+}
+.armor-card-stat b { color: var(--text); font-weight: 600; }
+.armor-card-quality {
+    font-family: 'Share Tech Mono', monospace; font-size: 10px;
+    color: var(--text-dim); margin-left: auto;
+}
