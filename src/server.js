@@ -136,6 +136,35 @@ function armorRank(quality) {
   return 'F';
 }
 
+function extractStats(stub, { intellect: ih, discipline: dh, strength: sh }) {
+  const arr = Array.isArray(stub.stats) ? stub.stats : Object.values(stub.stats ?? {});
+  return {
+    intellect:  arr.find(s => s.statHash === ih)?.value ?? 0,
+    discipline: arr.find(s => s.statHash === dh)?.value ?? 0,
+    strength:   arr.find(s => s.statHash === sh)?.value ?? 0,
+  };
+}
+
+function makeArmorRow(stub, itemData, location, characterId, armorStatHashes) {
+  const slot    = ARMOR_SLOT_NAMES[itemData.bucketTypeHash] ?? 'Unknown';
+  const { intellect, discipline, strength } = extractStats(stub, armorStatHashes);
+  const quality = calcArmorQuality(intellect, discipline, strength, slot);
+  return {
+    instanceId:   stub.itemInstanceId,
+    characterId:  characterId ?? null,
+    className:    ARMOR_CLASS_NAMES[itemData.classType] ?? null,
+    icon:         itemData.icon ? `https://www.bungie.net${itemData.icon}` : null,
+    name:         itemData.name,
+    type:         slot,
+    itemTypeName: itemData.itemTypeName,
+    rarity:       TIER_NAMES[itemData.tierType] ?? `Tier${itemData.tierType}`,
+    light:        stub.primaryStat?.value ?? null,
+    intellect, discipline, strength, quality,
+    rank:         armorRank(quality),
+    location,
+  };
+}
+
 function mapGodRollToGridColumns(rollDef, byColumn) {
   const mapping = {};
   for (const colKey of ['col1', 'col2', 'col3', 'col4']) {
@@ -396,39 +425,6 @@ async function runArmorEvaluation(bungieToken, bungieNetMembershipId, membership
   const platformMembershipId = await getMembershipId(mt, API_KEY, bungieToken, bungieNetMembershipId);
   const characters = await getCharacters(mt, platformMembershipId, API_KEY, bungieToken);
 
-  const ih = armorStatHashes.intellect;
-  const dh = armorStatHashes.discipline;
-  const sh = armorStatHashes.strength;
-
-  function extractStats(stub) {
-    const arr = Array.isArray(stub.stats) ? stub.stats : Object.values(stub.stats ?? {});
-    return {
-      intellect:  arr.find(s => s.statHash === ih)?.value ?? 0,
-      discipline: arr.find(s => s.statHash === dh)?.value ?? 0,
-      strength:   arr.find(s => s.statHash === sh)?.value ?? 0,
-    };
-  }
-
-  function makeArmorRow(stub, itemData, location, characterId) {
-    const slot    = ARMOR_SLOT_NAMES[itemData.bucketTypeHash] ?? 'Unknown';
-    const { intellect, discipline, strength } = extractStats(stub);
-    const quality = calcArmorQuality(intellect, discipline, strength, slot);
-    return {
-      instanceId:   stub.itemInstanceId,
-      characterId:  characterId ?? null,
-      className:    ARMOR_CLASS_NAMES[itemData.classType] ?? null, // null = universal (Ghost, Artifact)
-      icon:         itemData.icon ? `https://www.bungie.net${itemData.icon}` : null,
-      name:         itemData.name,
-      type:         slot,
-      itemTypeName: itemData.itemTypeName,
-      rarity:       TIER_NAMES[itemData.tierType] ?? `Tier${itemData.tierType}`,
-      light:        stub.primaryStat?.value ?? null,
-      intellect, discipline, strength, quality,
-      rank:         armorRank(quality),
-      location,
-    };
-  }
-
   const armorRows = [];
 
   for (const char of characters) {
@@ -436,7 +432,7 @@ async function runArmorEvaluation(bungieToken, bungieNetMembershipId, membership
     for (const stub of stubs) {
       const itemData = armorDataMap.get(stub.itemHash);
       if (!itemData) continue;
-      armorRows.push(makeArmorRow(stub, itemData, 'character', char.characterId));
+      armorRows.push(makeArmorRow(stub, itemData, 'character', char.characterId, armorStatHashes));
     }
   }
 
@@ -444,7 +440,7 @@ async function runArmorEvaluation(bungieToken, bungieNetMembershipId, membership
   for (const stub of vaultStubs) {
     const itemData = armorDataMap.get(stub.itemHash);
     if (!itemData) continue;
-    armorRows.push(makeArmorRow(stub, itemData, 'vault', null));
+    armorRows.push(makeArmorRow(stub, itemData, 'vault', null, armorStatHashes));
   }
 
   const rankOrder = { S: 0, A: 1, B: 2, C: 3, D: 4, F: 5, '—': 6 };
@@ -596,21 +592,15 @@ async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap
     // Collect armor sale items
     const armorRows = [];
     if (available) {
-      const ih = armorStatHashes.intellect;
-      const dh = armorStatHashes.discipline;
-      const sh = armorStatHashes.strength;
       for (const cat of vd?.saleItemCategories ?? []) {
         for (const si of cat.saleItems ?? []) {
           const stub = si.item;
           if (!stub) continue;
           const itemData = armorDataMap.get(stub.itemHash);
           if (!itemData || !ARMOR_BUCKET_SET.has(itemData.bucketTypeHash ?? 0)) continue;
-          const slot        = ARMOR_SLOT_NAMES[itemData.bucketTypeHash] ?? 'Unknown';
-          const statsArr    = Array.isArray(stub.stats) ? stub.stats : Object.values(stub.stats ?? {});
-          const intellect   = statsArr.find(s => s.statHash === ih)?.value ?? 0;
-          const discipline  = statsArr.find(s => s.statHash === dh)?.value ?? 0;
-          const strength    = statsArr.find(s => s.statHash === sh)?.value ?? 0;
-          const quality     = calcArmorQuality(intellect, discipline, strength, slot);
+          const slot                           = ARMOR_SLOT_NAMES[itemData.bucketTypeHash] ?? 'Unknown';
+          const { intellect, discipline, strength } = extractStats(stub, armorStatHashes);
+          const quality                        = calcArmorQuality(intellect, discipline, strength, slot);
           armorRows.push({
             instanceId:   `vendor-armor-${vendor.hash}-${stub.itemHash}`,
             icon:         itemData.icon ? `https://www.bungie.net${itemData.icon}` : null,
