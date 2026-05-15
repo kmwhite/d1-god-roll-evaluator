@@ -555,7 +555,8 @@ document.querySelectorAll('.tag-filter-btn').forEach(btn => {
 
 document.getElementById('search').addEventListener('input', e => {
   searchTerm = e.target.value;
-  render();
+  if (activeTab === 'weapons') render();
+  else if (activeTab === 'armor' && armorLoaded) renderArmor();
 });
 
 // ── Tag dropdown ──────────────────────────────────────────────────────────────
@@ -937,6 +938,13 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
     document.getElementById('tab-' + tab).style.display = '';
+    // Clear search on tab change so stale terms don't bleed across item types
+    searchTerm = '';
+    const searchEl = document.getElementById('search');
+    searchEl.value = '';
+    searchEl.placeholder = tab === 'armor' ? 'Search armor…' : 'Search weapon name…';
+    // Hide search on vendors tab — vendor search is not yet supported
+    document.getElementById('header-search').style.display = tab === 'vendors' ? 'none' : 'block';
     if (tab === 'vendors' && !vendorsLoaded) loadVendors();
     if (tab === 'armor'   && !armorLoaded)   loadArmor();
   });
@@ -1176,6 +1184,15 @@ function getArmorRows() {
   } else if (armorLocationFilter !== 'all') {
     // armorLocationFilter is a characterId string
     rows = rows.filter(r => r.characterId === armorLocationFilter);
+  }
+
+  if (searchTerm) {
+    const q = searchTerm.toLowerCase();
+    rows = rows.filter(r =>
+      r.name.toLowerCase().includes(q) ||
+      r.type.toLowerCase().includes(q) ||
+      (r.className ?? '').toLowerCase().includes(q)
+    );
   }
 
   rows.sort((a, b) => {
