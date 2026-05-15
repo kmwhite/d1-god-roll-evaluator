@@ -225,8 +225,8 @@ function esc(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function iconError(el) {
-  el.outerHTML = '<div class="weapon-icon-placeholder">⬡</div>';
+function iconError(el, cls) {
+  el.outerHTML = '<div' + (cls ? ' class="' + cls + '"' : '') + '>⬡</div>';
 }
 
 function perkCell(val) {
@@ -340,7 +340,7 @@ function render() {
     const rowspan = bothModes ? ' rowspan="2"' : '';
 
     const icon = rep.icon
-      ? '<img class="weapon-icon" src="' + esc(rep.icon) + '" alt="" loading="lazy" onerror="iconError(this)">'
+      ? '<img class="weapon-icon" src="' + esc(rep.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
       : '<div class="weapon-icon-placeholder">⬡</div>';
     const rarityClass = rep.rarity.toLowerCase();
     const damageClass = DAMAGE_CLASS[rep.damageRaw] ?? rep.damage.toLowerCase();
@@ -429,7 +429,7 @@ function render() {
 
     // Icon
     cardHtml += rep.icon
-      ? '<img class="weapon-card-icon" src="' + esc(rep.icon) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=\\\"weapon-card-icon-placeholder\\\">⬡</div>\'">'
+      ? '<img class="weapon-card-icon" src="' + esc(rep.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-card-icon-placeholder\')">'
       : '<div class="weapon-card-icon-placeholder">⬡</div>';
 
     // Body
@@ -441,7 +441,7 @@ function render() {
     if (rep.light) cardHtml += '<span class="light-val" style="font-size:11px">⬡ ' + rep.light + '</span>';
     cardHtml += '</div>';
     cardHtml += '<div class="weapon-card-pills">';
-    if (pve) cardHtml += resultPill(pve.result).replace('result-pill', 'result-pill') + ' ';
+    if (pve) cardHtml += resultPill(pve.result) + ' ';
     if (pvp) cardHtml += resultPill(pvp.result);
     cardHtml += '</div>';
     cardHtml += '</div>';
@@ -777,7 +777,7 @@ function openModal(instanceId, name, icon, type, rarity, damage, damageRaw, ligh
   const data = modalDataMap[instanceId] ?? VENDOR_MODAL_DATA[instanceId];
   const iconWrap = document.getElementById('modal-icon-wrap');
   iconWrap.innerHTML = icon
-    ? '<img class="modal-icon" src="' + esc(icon) + '" alt="" onerror="iconError(this)">'
+    ? '<img class="modal-icon" src="' + esc(icon) + '" alt="" onerror="iconError(this,\'modal-icon-placeholder\')">'
     : '<div class="modal-icon-placeholder">⬡</div>';
 
   document.getElementById('modal-name').textContent = name;
@@ -844,7 +844,7 @@ function openModal(instanceId, name, icon, type, rarity, damage, damageRaw, ligh
         html += '<div class="perk-column"><div class="perk-column-label">' + esc(label) + '</div>';
         for (const opt of col.options) {
           html += '<div class="perk-option' + (opt.isRolled ? ' is-rolled' : '') + '">';
-          html += opt.icon ? '<img class="perk-icon" src="' + esc(opt.icon) + '" alt="" onerror="iconError(this)">' : '<div class="perk-icon-placeholder"></div>';
+          html += opt.icon ? '<img class="perk-icon" src="' + esc(opt.icon) + '" alt="" onerror="iconError(this,\'perk-icon-placeholder\')">' : '<div class="perk-icon-placeholder"></div>';
           html += '<div class="perk-name">' + esc(opt.name) + '</div>';
           if (opt.desc) html += '<div class="perk-tooltip">' + esc(opt.desc) + '</div>';
           html += '</div>';
@@ -998,7 +998,7 @@ function renderVendorTable(rows, vendor) {
     const iid = rep.instanceId ?? '';
 
     const icon = rep.icon
-      ? '<img class="weapon-icon" src="' + esc(rep.icon) + '" alt="" loading="lazy" onerror="iconError(this)">'
+      ? '<img class="weapon-icon" src="' + esc(rep.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
       : '<div class="weapon-icon-placeholder">⬡</div>';
 
     const sharedAttrs = ' style="cursor:pointer"'
