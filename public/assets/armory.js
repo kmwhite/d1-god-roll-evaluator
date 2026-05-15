@@ -23,21 +23,6 @@ let armorTagFilter       = 'all';
 let armorSortCol         = 'rank';
 let armorSortDir         = 1;
 
-// Quality max per slot — source: https://l0r3.dev/page/Destiny-1-Maximum-Possible-Armor-Stats
-const ARMOR_MAX = {
-  'Helmet': 111, 'Gloves': 99, 'Chest': 147, 'Legs': 135,
-  'Class Item': 60, 'Ghost': 60, 'Artifact': 131,
-};
-
-function armorRank(quality) {
-  if (quality === null || quality === undefined) return '—';
-  if (quality >= 100) return 'S';
-  if (quality >= 95)  return 'A';
-  if (quality >= 90)  return 'B';
-  if (quality >= 80)  return 'C';
-  if (quality >= 70)  return 'D';
-  return 'F';
-}
 const DAMAGE_CLASS = { 0:'kinetic', 1:'kinetic', 2:'arc', 3:'solar', 4:'void' };
 
 // ── Tag system ────────────────────────────────────────────────────────────────
@@ -116,14 +101,11 @@ async function loadPlatforms(currentMembershipType) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ membershipType: newType }),
       });
-      // Reset and reload inventory for the new platform
       RAW = [];
       ARMOR_RAW = [];
       armorLoaded = false;
-      vendorRows_ = [];
+      vendorItems_ = [];
       vendorsLoaded = false;
-      Object.keys(modalDataMap).forEach(k => delete modalDataMap[k]);
-      Object.keys(transferMeta).forEach(k => delete transferMeta[k]);
       document.getElementById('vendors-container').innerHTML = '';
       await loadInventory();
     });
@@ -176,26 +158,11 @@ async function loadInventory() {
     const res = await fetch('/api/inventory');
     const raw = await res.json();
     if (!raw.ok) throw new Error(raw.error ?? 'Unknown error');
-    // Deep-clone via JSON round-trip to ensure all objects are in this page's
-    // JS context — avoids Firefox XrayWrapper cross-origin object errors
     const data = JSON.parse(JSON.stringify(raw));
-    RAW = data.rows;
+    RAW = data.items;
     characters = data.characters ?? [];
     characterIds = data.characterIds ?? [];
     platformMembershipId = data.platformMembershipId ?? null;
-    for (const r of RAW) {
-      if (r.instanceId) {
-        if (r.modalData) modalDataMap[r.instanceId] = r.modalData;
-        if (r.itemHash !== undefined) {
-          transferMeta[r.instanceId] = {
-            itemHash:       r.itemHash,
-            characterId:    r.characterId,
-            transferStatus: r.transferStatus,
-            location:       r.location,
-          };
-        }
-      }
-    }
     document.querySelector('th[data-col="result"]').classList.add('sort-asc');
     render();
   } catch (err) {
@@ -208,10 +175,8 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
   RAW = [];
   ARMOR_RAW = [];
   armorLoaded = false;
-  vendorRows_ = [];
+  vendorItems_ = [];
   vendorsLoaded = false;
-  Object.keys(modalDataMap).forEach(k => delete modalDataMap[k]);
-  Object.keys(transferMeta).forEach(k => delete transferMeta[k]);
   slotFilter = typeFilter = rarityFilter = damageFilter = 'all';
   loadInventory();
 });
@@ -308,40 +273,35 @@ document.querySelectorAll('.dyn-filter-btn').forEach(btn => {
   });
 });
 
+// Returns the evaluation(s) relevant to the current modeFilter for a weapon item.
+function activeEvals(item) {
+  if (modeFilter === 'pvp') return [item.evaluation.pvp];
+  if (modeFilter === 'pve') return [item.evaluation.pve];
+  return [item.evaluation.pvp, item.evaluation.pve].filter(Boolean);
+}
+
 function getRows() {
   let rows = [...RAW];
 
-  // Result/mode filter
-  if (filterMode === 'god-roll') rows = rows.filter(r => r.result.includes('GOD'));
-  else if (filterMode === 'close')   rows = rows.filter(r => r.result.includes('Close'));
-  else if (filterMode === 'no')      rows = rows.filter(r => r.result === '✗ No');
-  else if (filterMode === 'curated') rows = rows.filter(r => r.result.includes('Curated'));
-  else if (filterMode === 'unknown') rows = rows.filter(r => r.result === '? —');
-  else if (filterMode === 'error')   rows = rows.filter(r => r.result.includes('Error'));
-  else if (filterMode === 'pvp')     rows = rows.filter(r => r.mode === 'PvP');
-  else if (filterMode === 'pve')     rows = rows.filter(r => r.mode === 'PvE');
+  // Result filter — checked against whichever mode(s) are active
+  if (filterMode === 'god-roll') rows = rows.filter(r => activeEvals(r).some(e => e.result.includes('GOD')));
+  else if (filterMode === 'close')   rows = rows.filter(r => activeEvals(r).some(e => e.result.includes('Close')));
+  else if (filterMode === 'no')      rows = rows.filter(r => activeEvals(r).some(e => e.result === '✗ No'));
+  else if (filterMode === 'curated') rows = rows.filter(r => activeEvals(r).some(e => e.result.includes('Curated')));
+  else if (filterMode === 'unknown') rows = rows.filter(r => activeEvals(r).some(e => e.result === '? —'));
+  else if (filterMode === 'error')   rows = rows.filter(r => activeEvals(r).some(e => e.result.includes('Error')));
 
-  // Mode filter
-  if (modeFilter === 'pvp') rows = rows.filter(r => r.mode === 'PvP');
-  else if (modeFilter === 'pve') rows = rows.filter(r => r.mode === 'PvE');
-
-  // Slot / type / rarity / damage filters (match on any row in the pair)
   if (slotFilter   !== 'all') rows = rows.filter(r => r.slot   === slotFilter);
   if (typeFilter   !== 'all') rows = rows.filter(r => r.type   === typeFilter);
   if (rarityFilter !== 'all') rows = rows.filter(r => r.rarity === rarityFilter);
   if (damageFilter !== 'all') rows = rows.filter(r => r.damage === damageFilter);
 
-  // Tag filter — applied independently (AND with result filter)
   if (tagFilter !== 'all') {
     const tags = loadTags();
-    if (tagFilter === 'none') {
-      rows = rows.filter(r => !tags[r.instanceId]);
-    } else {
-      rows = rows.filter(r => tags[r.instanceId] === tagFilter);
-    }
+    if (tagFilter === 'none') rows = rows.filter(r => !tags[r.instanceId]);
+    else                      rows = rows.filter(r => tags[r.instanceId] === tagFilter);
   }
 
-  // Search
   if (searchTerm) {
     const q = searchTerm.toLowerCase();
     rows = rows.filter(r => r.name.toLowerCase().includes(q) || r.type.toLowerCase().includes(q));
@@ -349,7 +309,10 @@ function getRows() {
 
   rows.sort((a, b) => {
     let av = a[sortCol] ?? '', bv = b[sortCol] ?? '';
-    if (sortCol === 'result') { av = a.resultRank; bv = b.resultRank; }
+    if (sortCol === 'result') {
+      av = Math.min(...activeEvals(a).map(e => e.resultRank ?? 99));
+      bv = Math.min(...activeEvals(b).map(e => e.resultRank ?? 99));
+    }
     if (typeof av === 'number') return (av - bv) * sortDir;
     return String(av).localeCompare(String(bv)) * sortDir;
   });
@@ -357,33 +320,23 @@ function getRows() {
 }
 
 function render() {
-  const rows = getRows();
-  const tbody = document.getElementById('tbody');
-
-  // Group rows into weapon pairs: { pvp, pve, instanceId, ... }
-  // A pair may be missing one mode if filtered to PvP or PvE only.
-  const pairMap = new Map();
-  for (const r of rows) {
-    const key = r.instanceId ?? (r.name + '|' + r.mode);
-    if (!pairMap.has(key)) pairMap.set(key, {});
-    pairMap.get(key)[r.mode] = r;
-  }
-  const pairs = [...pairMap.values()];
+  const items  = getRows();
+  const tbody  = document.getElementById('tbody');
 
   let html = '';
-  for (const pair of pairs) {
-    const pvp = pair['PvP'];
-    const pve = pair['PvE'];
-    const rep = pvp ?? pve; // representative row for shared cells
-    const iid = rep.instanceId ?? '';
-    const bothModes = !!(pvp && pve);
-    const rowspan = bothModes ? ' rowspan="2"' : '';
+  for (const item of items) {
+    const iid        = item.instanceId ?? '';
+    const pvp        = modeFilter !== 'pve' ? item.evaluation.pvp : null;
+    const pve        = modeFilter !== 'pvp' ? item.evaluation.pve : null;
+    const firstEval  = pve ?? pvp;
+    const bothModes  = !!(pvp && pve);
+    const rowspan    = bothModes ? ' rowspan="2"' : '';
+    const rarityClass = item.rarity.toLowerCase();
+    const damageClass = DAMAGE_CLASS[item.damageRaw] ?? item.damage.toLowerCase();
 
-    const icon = rep.icon
-      ? '<img class="weapon-icon" src="' + esc(rep.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
+    const icon = item.icon
+      ? '<img class="weapon-icon" src="' + esc(item.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
       : '<div class="weapon-icon-placeholder">⬡</div>';
-    const rarityClass = rep.rarity.toLowerCase();
-    const damageClass = DAMAGE_CLASS[rep.damageRaw] ?? rep.damage.toLowerCase();
 
     const tag     = getTag(iid);
     const tagInfo = tag ? TAGS[tag] : null;
@@ -397,42 +350,30 @@ function render() {
       + '<button class="tag-option clear" onclick="setTag(event,\'' + esc(iid) + '\',null)">❌ Clear</button>'
       + '</div></td>';
 
-    const sharedAttrs = ' style="cursor:pointer"'
-      + ' data-instanceid="' + esc(iid) + '"'
-      + ' data-name="' + esc(rep.name) + '"'
-      + ' data-icon="' + esc(rep.icon ?? '') + '"'
-      + ' data-type="' + esc(rep.type) + '"'
-      + ' data-rarity="' + esc(rep.rarity) + '"'
-      + ' data-damage="' + esc(rep.damage) + '"'
-      + ' data-damageraw="' + esc(String(rep.damageRaw ?? 0)) + '"'
-      + ' data-light="' + esc(String(rep.light ?? '')) + '"';
-
-    // Shared cells — only in first row, with rowspan if both modes present
+    const rowAttrs = ' style="cursor:pointer" data-instanceid="' + esc(iid) + '"';
     const sharedCells =
       '<td class="icon-cell"' + rowspan + '>' + icon + '</td>'
-      + '<td class="name-cell"' + rowspan + '>' + esc(rep.name) + '</td>'
-      + '<td' + rowspan + '>' + esc(rep.type) + '</td>'
-      + '<td' + rowspan + '><span class="badge ' + rarityClass + '">' + esc(rep.rarity) + '</span></td>'
-      + '<td' + rowspan + '><span class="damage-dot ' + damageClass + '">' + esc(rep.damage) + '</span></td>'
-      + '<td' + rowspan + '><span class="light-val">' + (rep.light !== null ? rep.light : '—') + '</span></td>';
+      + '<td class="name-cell"' + rowspan + '>' + esc(item.name) + '</td>'
+      + '<td' + rowspan + '>' + esc(item.type) + '</td>'
+      + '<td' + rowspan + '><span class="badge ' + rarityClass + '">' + esc(item.rarity) + '</span></td>'
+      + '<td' + rowspan + '><span class="damage-dot ' + damageClass + '">' + esc(item.damage) + '</span></td>'
+      + '<td' + rowspan + '><span class="light-val">' + (item.light !== null ? item.light : '—') + '</span></td>';
 
-    // First row (PvE if available, else the single mode)
-    const firstRow = pve ?? pvp;
-    html += '<tr class="pair-start"' + sharedAttrs + '>';
+    const modeLabel = pve ? 'PvE' : 'PvP';
+    html += '<tr class="pair-start"' + rowAttrs + '>';
     html += sharedCells;
-    html += '<td><span class="mode-badge mode-' + firstRow.mode.toLowerCase() + '">' + esc(firstRow.mode) + '</span></td>';
-    html += '<td class="perk-cell">' + perkCell(firstRow.col1) + '</td>';
-    html += '<td class="perk-cell">' + perkCell(firstRow.col2) + '</td>';
-    html += '<td class="perk-cell">' + perkCell(firstRow.col3) + '</td>';
-    html += '<td class="perk-cell">' + perkCell(firstRow.col4) + '</td>';
-    html += '<td>' + resultPill(firstRow.result) + '</td>';
+    html += '<td><span class="mode-badge mode-' + modeLabel.toLowerCase() + '">' + modeLabel + '</span></td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col1) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col2) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col3) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col4) + '</td>';
+    html += '<td>' + resultPill(firstEval.result) + '</td>';
     html += tagCell;
     html += '</tr>';
 
-    // Second row (PvP) — only if both modes present
     if (bothModes) {
-      html += '<tr class="pair-end"' + sharedAttrs + '>';
-      html += '<td><span class="mode-badge mode-pvp">' + esc(pvp.mode) + '</span></td>';
+      html += '<tr class="pair-end"' + rowAttrs + '>';
+      html += '<td><span class="mode-badge mode-pvp">PvP</span></td>';
       html += '<td class="perk-cell">' + perkCell(pvp.col1) + '</td>';
       html += '<td class="perk-cell">' + perkCell(pvp.col2) + '</td>';
       html += '<td class="perk-cell">' + perkCell(pvp.col3) + '</td>';
@@ -441,85 +382,56 @@ function render() {
       html += '</tr>';
     }
   }
-
   tbody.innerHTML = html;
 
   // ── Mobile card view ──────────────────────────────────────────────────────
   const cardsEl = document.getElementById('weapon-cards');
   let cardHtml = '';
-  for (const pair of pairs) {
-    const pvp = pair['PvP'];
-    const pve = pair['PvE'];
-    const rep = pvp ?? pve;
-    const iid = rep.instanceId ?? '';
-    const tag = getTag(iid);
-    const tagInfo = tag ? TAGS[tag] : null;
-    const damageClass = DAMAGE_CLASS[rep.damageRaw] ?? rep.damage.toLowerCase();
-
-    const cardAttrs = ' data-instanceid="' + esc(iid) + '"'
-      + ' data-name="' + esc(rep.name) + '"'
-      + ' data-icon="' + esc(rep.icon ?? '') + '"'
-      + ' data-type="' + esc(rep.type) + '"'
-      + ' data-rarity="' + esc(rep.rarity) + '"'
-      + ' data-damage="' + esc(rep.damage) + '"'
-      + ' data-damageraw="' + esc(String(rep.damageRaw ?? 0)) + '"'
-      + ' data-light="' + esc(String(rep.light ?? '')) + '"';
-
-    cardHtml += '<div class="weapon-card"' + cardAttrs + '>';
-
-    // Icon
-    cardHtml += rep.icon
-      ? '<img class="weapon-card-icon" src="' + esc(rep.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-card-icon-placeholder\')">'
-      : '<div class="weapon-card-icon-placeholder">⬡</div>';
-
-    // Body
-    cardHtml += '<div class="weapon-card-body">';
-    cardHtml += '<div class="weapon-card-name">' + esc(rep.name) + '</div>';
-    const weaponMeta     = transferMeta[iid];
-    const weaponLoc      = weaponMeta?.location;
-    const weaponIsVault  = weaponLoc === 2;
-    const weaponLocLabel = weaponIsVault
+  for (const item of items) {
+    const iid        = item.instanceId ?? '';
+    const pvp        = modeFilter !== 'pve' ? item.evaluation.pvp : null;
+    const pve        = modeFilter !== 'pvp' ? item.evaluation.pve : null;
+    const tag        = getTag(iid);
+    const tagInfo    = tag ? TAGS[tag] : null;
+    const damageClass = DAMAGE_CLASS[item.damageRaw] ?? item.damage.toLowerCase();
+    const isVault    = item.location === 2;
+    const locLabel   = isVault
       ? 'vault'
-      : (characters.find(c => c.characterId === weaponMeta?.characterId)?.className ?? null);
-    const weaponLocClass = weaponIsVault ? 'loc-vault' : '';
+      : (characters.find(c => c.characterId === item.characterId)?.className ?? null);
+    const locClass   = isVault ? 'loc-vault' : '';
 
+    cardHtml += '<div class="weapon-card" data-instanceid="' + esc(iid) + '">';
+    cardHtml += item.icon
+      ? '<img class="weapon-card-icon" src="' + esc(item.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-card-icon-placeholder\')">'
+      : '<div class="weapon-card-icon-placeholder">⬡</div>';
+    cardHtml += '<div class="weapon-card-body">';
+    cardHtml += '<div class="weapon-card-name">' + esc(item.name) + '</div>';
     cardHtml += '<div class="weapon-card-meta">';
-    cardHtml += '<span class="badge ' + rep.rarity.toLowerCase() + '">' + esc(rep.rarity) + '</span>';
-    cardHtml += '<span class="damage-dot ' + damageClass + '">' + esc(rep.damage) + '</span>';
-    if (rep.light) cardHtml += '<span class="light-val" style="font-size:11px">⬡ ' + rep.light + '</span>';
-    if (weaponLocLabel) cardHtml += '<span class="item-card-location ' + weaponLocClass + '">' + esc(weaponLocLabel) + '</span>';
+    cardHtml += '<span class="badge ' + item.rarity.toLowerCase() + '">' + esc(item.rarity) + '</span>';
+    cardHtml += '<span class="damage-dot ' + damageClass + '">' + esc(item.damage) + '</span>';
+    if (item.light) cardHtml += '<span class="light-val" style="font-size:11px">⬡ ' + item.light + '</span>';
+    if (locLabel) cardHtml += '<span class="item-card-location ' + locClass + '">' + esc(locLabel) + '</span>';
     cardHtml += '</div>';
     cardHtml += '<div class="weapon-card-pills">';
     if (pve) cardHtml += resultPill(pve.result) + ' ';
     if (pvp) cardHtml += resultPill(pvp.result);
     cardHtml += '</div>';
     cardHtml += '</div>';
-
-    // Tag indicator
-    if (tagInfo) {
-      cardHtml += '<span class="weapon-card-tag ' + tagInfo.cls + '">' + tagInfo.label + '</span>';
-    }
-
+    if (tagInfo) cardHtml += '<span class="weapon-card-tag ' + tagInfo.cls + '">' + tagInfo.label + '</span>';
     cardHtml += '</div>';
   }
   cardsEl.innerHTML = cardHtml;
 
-  // Wire card clicks to modal
   cardsEl.querySelectorAll('.weapon-card').forEach(card => {
     card.addEventListener('click', () => {
-      openModal(
-        card.dataset.instanceid, card.dataset.name, card.dataset.icon,
-        card.dataset.type, card.dataset.rarity, card.dataset.damage,
-        parseInt(card.dataset.damageraw ?? '0', 10),
-        card.dataset.light ? parseInt(card.dataset.light, 10) : null,
-      );
+      const item = findItem(card.dataset.instanceid);
+      if (item) openModal(item);
     });
   });
 
-  // Count weapons (pairs), not rows
-  document.getElementById('stat-total').textContent = pairs.length;
-  document.getElementById('stat-god').textContent   = pairs.filter(p => Object.values(p).some(r => r.result.includes('GOD'))).length;
-  document.getElementById('stat-close').textContent = pairs.filter(p => Object.values(p).some(r => r.result.includes('Close'))).length;
+  document.getElementById('stat-total').textContent = items.length;
+  document.getElementById('stat-god').textContent   = items.filter(r => activeEvals(r).some(e => e.result.includes('GOD'))).length;
+  document.getElementById('stat-close').textContent = items.filter(r => activeEvals(r).some(e => e.result.includes('Close'))).length;
 
   updateLayout();
 }
@@ -608,8 +520,13 @@ document.addEventListener('click', () => {
     openDropdownId = null;
   }
 });
-const modalDataMap = {};
-const transferMeta = {};
+// Finds a normalized item by instanceId across weapons, armor, and vendor items.
+function findItem(instanceId) {
+  return RAW.find(r => r.instanceId === instanceId)
+    ?? ARMOR_RAW.find(r => r.instanceId === instanceId)
+    ?? vendorItems_.find(r => r.instanceId === instanceId)
+    ?? null;
+}
 
 // ── Transfer ──────────────────────────────────────────────────────────────────
 
@@ -618,10 +535,10 @@ const transferMeta = {};
  * destCharId: character ID to send to, or null for vault.
  */
 async function transferItem(instanceId, destCharId) {
-  const meta = transferMeta[instanceId];
-  if (!meta) return { ok: false, error: 'No transfer metadata for this item' };
+  const item = findItem(instanceId);
+  if (!item) return { ok: false, error: 'No transfer data for this item' };
 
-  const { itemHash, characterId: sourceCharId, transferStatus, location } = meta;
+  const { itemHash, characterId: sourceCharId, transferStatus, location } = item;
   const LOCATION_CHARACTER = 1;
   const LOCATION_VAULT = 2;
 
@@ -671,12 +588,8 @@ async function handleEquip(instanceId, charId, btnEl) {
   });
   const result = await res.json();
   if (result.ok) {
-    const meta = transferMeta[instanceId];
-    if (meta) {
-      meta.transferStatus = 1; // now equipped
-      meta.characterId    = charId;
-      meta.location       = 1;
-    }
+    const item = findItem(instanceId);
+    if (item) { item.transferStatus = 1; item.characterId = charId; item.location = 1; }
     renderTransferButtons(instanceId);
     refreshInventoryBackground();
   } else {
@@ -691,12 +604,8 @@ async function handleTransfer(instanceId, destCharId, btnEl) {
   btnEl.textContent = '…';
   const result = await transferItem(instanceId, destCharId);
   if (result.ok) {
-    // Update local metadata so buttons reflect new location
-    const meta = transferMeta[instanceId];
-    if (meta) {
-      meta.location   = destCharId === null ? 2 : 1;
-      meta.characterId = destCharId;
-    }
+    const item = findItem(instanceId);
+    if (item) { item.location = destCharId === null ? 2 : 1; item.characterId = destCharId; }
     renderTransferButtons(instanceId);
     // Also trigger a background inventory refresh so table stays current
     refreshInventoryBackground();
@@ -714,21 +623,10 @@ async function refreshInventoryBackground() {
     const raw  = await res.json();
     if (!raw.ok) return;
     const data = JSON.parse(JSON.stringify(raw));
-    RAW = data.rows;
+    RAW = data.items;
     characters = data.characters ?? characters;
     characterIds = data.characterIds ?? characterIds;
     platformMembershipId = data.platformMembershipId ?? platformMembershipId;
-    for (const r of RAW) {
-      if (r.instanceId) {
-        if (r.modalData) modalDataMap[r.instanceId] = r.modalData;
-        if (r.itemHash !== undefined) {
-          transferMeta[r.instanceId] = {
-            itemHash: r.itemHash, characterId: r.characterId,
-            transferStatus: r.transferStatus, location: r.location,
-          };
-        }
-      }
-    }
     render();
   } catch { /* silent — user can manual refresh */ }
 }
@@ -737,10 +635,10 @@ function renderTransferButtons(instanceId) {
   const container = document.getElementById('modal-transfer-section');
   if (!container) return;
   if (!instanceId) { container.innerHTML = ''; return; }
-  const meta = transferMeta[instanceId];
-  if (!meta) { container.innerHTML = ''; return; }
+  const item = findItem(instanceId);
+  if (!item || item.itemType !== 'weapon' || item.isVendorItem) { container.innerHTML = ''; return; }
 
-  const { characterId: currentCharId, transferStatus, location } = meta;
+  const { characterId: currentCharId, transferStatus, location } = item;
   const LOCATION_VAULT = 2;
   const canTransfer = transferStatus === 0;
   const isEquipped  = transferStatus === 1;
@@ -826,53 +724,58 @@ function renderModalTag(instanceId) {
   container.innerHTML = html;
 }
 
-function openModal(instanceId, name, icon, type, rarity, damage, damageRaw, light, isVendorItem) {
-  const data = modalDataMap[instanceId] ?? VENDOR_MODAL_DATA[instanceId];
+function openModal(item) {
+  if (!item) return;
   const iconWrap = document.getElementById('modal-icon-wrap');
-  iconWrap.innerHTML = icon
-    ? '<img class="modal-icon" src="' + esc(icon) + '" alt="" onerror="iconError(this,\'modal-icon-placeholder\')">'
+  iconWrap.innerHTML = item.icon
+    ? '<img class="modal-icon" src="' + esc(item.icon) + '" alt="" onerror="iconError(this,\'modal-icon-placeholder\')">'
     : '<div class="modal-icon-placeholder">⬡</div>';
 
-  document.getElementById('modal-name').textContent = name;
-  document.getElementById('modal-meta').innerHTML =
-    '<span class="badge ' + rarity.toLowerCase() + '">' + esc(rarity) + '</span>' +
-    '<span class="damage-dot ' + (DAMAGE_CLASS[damageRaw] ?? damage.toLowerCase()) + '">' + esc(damage) + '</span>' +
-    (light !== null ? '<span class="light-val">⬡ ' + light + '</span>' : '') +
-    '<span style="color:var(--text-dim);font-size:12px">' + esc(type) + '</span>';
+  document.getElementById('modal-name').textContent = item.name;
+  let metaHtml = '<span class="badge ' + (item.rarity ?? '').toLowerCase() + '">' + esc(item.rarity ?? '—') + '</span>';
+  if (item.itemType === 'weapon') {
+    metaHtml += '<span class="damage-dot ' + (DAMAGE_CLASS[item.damageRaw] ?? item.damage.toLowerCase()) + '">' + esc(item.damage) + '</span>';
+  }
+  if (item.light != null) metaHtml += '<span class="light-val">⬡ ' + item.light + '</span>';
+  metaHtml += '<span style="color:var(--text-dim);font-size:12px">' + esc(item.type) + '</span>';
+  if (item.itemType === 'armor' && item.className) {
+    metaHtml += '<span style="color:var(--text-dim);font-size:12px;margin-left:6px">' + esc(item.className) + '</span>';
+  }
+  document.getElementById('modal-meta').innerHTML = metaHtml;
 
-  renderModalTag(isVendorItem ? null : instanceId);
-  renderTransferButtons(isVendorItem ? null : instanceId);
+  const suppressed = !!item.isVendorItem;
+  renderModalTag(suppressed ? null : item.instanceId);
+  renderTransferButtons(suppressed ? null : item.instanceId);
 
   const body = document.getElementById('modal-content');
-  if (!data) {
-    body.innerHTML = '<p style="color:var(--text-dim);font-family:Share Tech Mono,monospace;font-size:12px">No detail data available.</p>';
-  } else {
-    let html = '';
-    if (data.stats && data.stats.length > 0) {
-      html += '<div class="modal-section-title">Stats</div><div class="stats-grid">';
-      for (const s of data.stats) {
-        const pct = Math.round((s.value / (s.max || 100)) * 100);
-        const cls = pct >= 70 ? 'high' : pct >= 40 ? 'mid' : 'low';
-        html += '<div class="stat-row"><div class="stat-label-row"><span class="stat-name">' + esc(s.name) + '</span><span class="stat-value">' + s.value + '</span></div><div class="stat-bar-track"><div class="stat-bar-fill ' + cls + '" style="width:' + pct + '%"></div></div></div>';
-      }
-      html += '</div>';
-    }
+  let html = '';
 
-    const pvpRow = RAW.find(r => r.instanceId === instanceId && r.mode === 'PvP')
-      ?? vendorRows_?.find(r => r.instanceId === instanceId && r.mode === 'PvP');
-    const pveRow = RAW.find(r => r.instanceId === instanceId && r.mode === 'PvE')
-      ?? vendorRows_?.find(r => r.instanceId === instanceId && r.mode === 'PvE');
-    if (pvpRow || pveRow) {
+  // Stats section (works for weapon and armor)
+  if (item.stats?.length > 0) {
+    html += '<div class="modal-section-title">Stats</div><div class="stats-grid">';
+    for (const s of item.stats) {
+      const pct = Math.round((s.value / (s.max || 100)) * 100);
+      const cls = pct >= 70 ? 'high' : pct >= 40 ? 'mid' : 'low';
+      html += '<div class="stat-row"><div class="stat-label-row"><span class="stat-name">' + esc(s.name) + '</span><span class="stat-value">' + s.value + '</span></div>'
+        + '<div class="stat-bar-track"><div class="stat-bar-fill ' + cls + '" style="width:' + pct + '%"></div></div></div>';
+    }
+    html += '</div>';
+  }
+
+  // Weapon evaluation section
+  if (item.itemType === 'weapon' && item.evaluation) {
+    const { pvp, pve } = item.evaluation;
+    if (pvp || pve) {
       html += '<div class="modal-section-title">God Roll Evaluation</div><div class="god-roll-eval">';
-      for (const [modeKey, row] of [['pve', pveRow], ['pvp', pvpRow]]) {
-        if (!row) continue;
-        const label = modeKey === 'pvp' ? 'PvP' : 'PvE';
-        const resultText = row.result ?? '—';
-        const badgeCls = resultText.includes('GOD') ? 'god' : resultText.includes('Close') ? 'close' : 'no';
+      for (const [modeKey, ev] of [['pve', pve], ['pvp', pvp]]) {
+        if (!ev) continue;
+        const label      = modeKey === 'pvp' ? 'PvP' : 'PvE';
+        const resultText = ev.result ?? '—';
+        const badgeCls   = resultText.includes('GOD') ? 'god' : resultText.includes('Close') ? 'close' : 'no';
         html += '<div class="god-roll-mode ' + modeKey + '"><div class="god-roll-mode-title">' + label + '</div>';
-        html += '<div class="god-roll-result-badge ' + badgeCls + '">' + esc(resultText + (row.source ? ' (' + row.source + ')' : '')) + '</div>';
+        html += '<div class="god-roll-result-badge ' + badgeCls + '">' + esc(resultText + (ev.source ? ' (' + ev.source + ')' : '')) + '</div>';
         html += '<div class="god-roll-col-list">';
-        for (const [idx, colVal] of [[1, row.col1],[2, row.col2],[3, row.col3],[4, row.col4]]) {
+        for (const [idx, colVal] of [[1, ev.col1],[2, ev.col2],[3, ev.col3],[4, ev.col4]]) {
           if (!colVal || colVal === '—') continue;
           const isHit  = colVal.startsWith('✓');
           const isMiss = colVal.startsWith('✗');
@@ -888,26 +791,42 @@ function openModal(instanceId, name, icon, type, rarity, damage, damageRaw, ligh
       }
       html += '</div>';
     }
+  }
 
-    if (data.columns && data.columns.length > 0) {
-      html += '<div class="modal-section-title">Perks</div><div class="perk-columns">';
-      const colsSeen = [...new Set(data.columns.map(c => c.colIndex))].sort((a,b) => a-b);
-      for (const col of data.columns) {
-        const label = 'Column ' + (colsSeen.indexOf(col.colIndex) + 1);
-        html += '<div class="perk-column"><div class="perk-column-label">' + esc(label) + '</div>';
-        for (const opt of col.options) {
-          html += '<div class="perk-option' + (opt.isRolled ? ' is-rolled' : '') + '">';
-          html += opt.icon ? '<img class="perk-icon" src="' + esc(opt.icon) + '" alt="" onerror="iconError(this,\'perk-icon-placeholder\')">' : '<div class="perk-icon-placeholder"></div>';
-          html += '<div class="perk-name">' + esc(opt.name) + '</div>';
-          if (opt.desc) html += '<div class="perk-tooltip">' + esc(opt.desc) + '</div>';
-          html += '</div>';
-        }
+  // Armor evaluation section
+  if (item.itemType === 'armor' && item.evaluation) {
+    const { rank, quality } = item.evaluation;
+    const rankKey = rank === '—' ? 'none' : (rank ?? '').toLowerCase();
+    html += '<div class="modal-section-title">Quality</div>';
+    html += '<div style="display:flex;align-items:center;gap:12px;padding:8px 0">';
+    html += '<span class="rank-badge rank-' + rankKey + '">' + esc(rank ?? '—') + '</span>';
+    if (quality !== null && quality !== undefined) {
+      html += '<span style="font-family:Share Tech Mono,monospace;font-size:13px;color:var(--text)">' + quality + '%</span>';
+    }
+    html += '</div>';
+  }
+
+  // Perks section (weapon only currently)
+  if (item.perks?.length > 0) {
+    html += '<div class="modal-section-title">Perks</div><div class="perk-columns">';
+    const colsSeen = [...new Set(item.perks.map(c => c.colIndex))].sort((a, b) => a - b);
+    for (const col of item.perks) {
+      const label = 'Column ' + (colsSeen.indexOf(col.colIndex) + 1);
+      html += '<div class="perk-column"><div class="perk-column-label">' + esc(label) + '</div>';
+      for (const opt of col.options) {
+        html += '<div class="perk-option' + (opt.isRolled ? ' is-rolled' : '') + '">';
+        html += opt.icon ? '<img class="perk-icon" src="' + esc(opt.icon) + '" alt="" onerror="iconError(this,\'perk-icon-placeholder\')">' : '<div class="perk-icon-placeholder"></div>';
+        html += '<div class="perk-name">' + esc(opt.name) + '</div>';
+        if (opt.desc) html += '<div class="perk-tooltip">' + esc(opt.desc) + '</div>';
         html += '</div>';
       }
       html += '</div>';
     }
-    body.innerHTML = html;
+    html += '</div>';
   }
+
+  if (!html) html = '<p style="color:var(--text-dim);font-family:Share Tech Mono,monospace;font-size:12px">No detail data available.</p>';
+  body.innerHTML = html;
 
   document.getElementById('modal-backdrop').classList.add('open');
   document.body.style.overflow = 'hidden';
@@ -927,12 +846,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
 document.getElementById('tbody').addEventListener('click', e => {
   const row = e.target.closest('tr[data-instanceid]');
   if (!row) return;
-  openModal(
-    row.dataset.instanceid, row.dataset.name, row.dataset.icon,
-    row.dataset.type, row.dataset.rarity, row.dataset.damage,
-    parseInt(row.dataset.damageraw ?? '0', 10),
-    row.dataset.light ? parseInt(row.dataset.light, 10) : null,
-  );
+  const item = findItem(row.dataset.instanceid);
+  if (item) openModal(item);
 });
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -962,8 +877,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 // ── Vendor loading ────────────────────────────────────────────────────────────
 
-let VENDOR_MODAL_DATA = {}; // instanceId → modalData for vendor items
-let vendorRows_ = [];       // flat array of all vendor rows for modal god roll lookup
+let vendorItems_ = []; // flat array of all vendor items for findItem() lookup
 
 async function loadVendors() {
   const container = document.getElementById('vendors-container');
@@ -974,13 +888,9 @@ async function loadVendors() {
     if (!raw.ok) throw new Error(raw.error ?? 'Unknown error');
     const data = JSON.parse(JSON.stringify(raw));
 
-    // Store modal data and flat rows for god roll lookup
-    vendorRows_ = [];
+    vendorItems_ = [];
     for (const section of data.sections) {
-      for (const r of section.rows) {
-        vendorRows_.push(r);
-        if (r.instanceId && r.modalData) VENDOR_MODAL_DATA[r.instanceId] = r.modalData;
-      }
+      for (const item of section.items ?? []) vendorItems_.push(item);
     }
 
     renderVendors(data.sections);
@@ -1002,105 +912,75 @@ function renderVendors(sections) {
     html += '<div class="vendor-location">' + esc(v.location) + '</div></div>';
     html += '</div>';
 
-    if (!section.available || section.rows.length === 0) {
+    const weaponItems = (section.items ?? []).filter(r => r.itemType === 'weapon');
+    const armorItems  = (section.items ?? []).filter(r => r.itemType === 'armor');
+    if (!section.available || weaponItems.length === 0) {
       const msg = !section.available ? (section.error ?? 'Currently unavailable') : 'No weapons available';
       html += '<div class="vendor-empty">' + esc(msg) + '</div>';
     } else {
-      html += renderVendorTable(section.rows, v);
+      html += renderVendorTable(weaponItems);
     }
-    if (section.armorRows && section.armorRows.length > 0) {
-      html += renderVendorArmorTable(section.armorRows);
+    if (armorItems.length > 0) {
+      html += renderVendorArmorTable(armorItems);
     }
     html += '</div>';
   }
 
   container.innerHTML = html;
 
-  // Wire up row clicks for modal
   container.querySelectorAll('tr[data-instanceid]').forEach(row => {
     row.addEventListener('click', () => {
-      openModal(
-        row.dataset.instanceid, row.dataset.name, row.dataset.icon,
-        row.dataset.type, row.dataset.rarity, row.dataset.damage,
-        parseInt(row.dataset.damageraw ?? '0', 10), null,
-        true // isVendorItem — suppresses tag/transfer sections
-      );
+      const item = findItem(row.dataset.instanceid);
+      if (item) openModal(item);
     });
   });
 }
 
-function renderVendorTable(rows, vendor) {
-  // Group into pairs same as inventory render
-  const pairMap = new Map();
-  for (const r of rows) {
-    const key = r.instanceId ?? r.name;
-    if (!pairMap.has(key)) pairMap.set(key, {});
-    pairMap.get(key)[r.mode] = r;
-  }
-
+function renderVendorTable(items) {
   let html = '<div class="table-wrap" style="padding:0"><table style="width:100%;border-collapse:collapse;font-size:13px">';
   html += '<thead><tr>';
-  html += '<th class="no-sort" style="' + thStyle() + '">Icon</th>';
-  html += '<th style="' + thStyle() + '">Weapon</th>';
-  html += '<th style="' + thStyle() + '">Type</th>';
-  html += '<th style="' + thStyle() + '">Rarity</th>';
-  html += '<th style="' + thStyle() + '">Damage</th>';
-  html += '<th style="' + thStyle() + '">Mode</th>';
-  html += '<th style="' + thStyle() + '">Column 1</th>';
-  html += '<th style="' + thStyle() + '">Column 2</th>';
-  html += '<th style="' + thStyle() + '">Column 3</th>';
-  html += '<th style="' + thStyle() + '">Column 4</th>';
-  html += '<th style="' + thStyle() + '">Result</th>';
+  ['Icon','Weapon','Type','Rarity','Damage','Mode','Column 1','Column 2','Column 3','Column 4','Result'].forEach(h => {
+    html += '<th class="no-sort" style="' + thStyle() + '">' + h + '</th>';
+  });
   html += '</tr></thead><tbody>';
 
-  for (const pair of pairMap.values()) {
-    const pve = pair['PvE'];
-    const pvp = pair['PvP'];
-    const rep = pve ?? pvp;
-    const bothModes = !!(pve && pvp);
-    const rowspan = bothModes ? ' rowspan="2"' : '';
-    const iid = rep.instanceId ?? '';
+  for (const item of items) {
+    const iid       = item.instanceId ?? '';
+    const pvp       = item.evaluation?.pvp;
+    const pve       = item.evaluation?.pve;
+    const firstEval = pve ?? pvp;
+    const bothModes = !!(pvp && pve);
+    const rowspan   = bothModes ? ' rowspan="2"' : '';
+    const rowAttrs  = ' style="cursor:pointer" data-instanceid="' + esc(iid) + '"';
+    const damageClass = DAMAGE_CLASS[item.damageRaw] ?? (item.damage ?? '').toLowerCase();
 
-    const icon = rep.icon
-      ? '<img class="weapon-icon" src="' + esc(rep.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
+    const icon = item.icon
+      ? '<img class="weapon-icon" src="' + esc(item.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
       : '<div class="weapon-icon-placeholder">⬡</div>';
 
-    const sharedAttrs = ' style="cursor:pointer"'
-      + ' data-instanceid="' + esc(iid) + '"'
-      + ' data-name="' + esc(rep.name) + '"'
-      + ' data-icon="' + esc(rep.icon ?? '') + '"'
-      + ' data-type="' + esc(rep.type) + '"'
-      + ' data-rarity="' + esc(rep.rarity) + '"'
-      + ' data-damage="' + esc(rep.damage) + '"'
-      + ' data-damageraw="' + esc(String(rep.damageRaw ?? 0)) + '"';
-
     const sharedCells =
-      '<td class="icon-cell"' + rowspan + '>' + icon + '</td>' +
-      '<td class="name-cell"' + rowspan + '>' + esc(rep.name) + '</td>' +
-      '<td' + rowspan + '>' + esc(rep.type) + '</td>' +
-      '<td' + rowspan + '><span class="badge ' + rep.rarity.toLowerCase() + '">' + esc(rep.rarity) + '</span></td>' +
-      '<td' + rowspan + '><span class="damage-dot ' + (DAMAGE_CLASS[rep.damageRaw] ?? rep.damage.toLowerCase()) + '">' + esc(rep.damage) + '</span></td>';
+      '<td class="icon-cell"' + rowspan + '>' + icon + '</td>'
+      + '<td class="name-cell"' + rowspan + '>' + esc(item.name) + '</td>'
+      + '<td' + rowspan + '>' + esc(item.type) + '</td>'
+      + '<td' + rowspan + '><span class="badge ' + (item.rarity ?? '').toLowerCase() + '">' + esc(item.rarity ?? '—') + '</span></td>'
+      + '<td' + rowspan + '><span class="damage-dot ' + damageClass + '">' + esc(item.damage ?? '—') + '</span></td>';
 
-    const firstRow = pve ?? pvp;
-    html += '<tr class="pair-start"' + sharedAttrs + '>';
-    html += sharedCells;
-    html += '<td><span class="mode-badge mode-' + firstRow.mode.toLowerCase() + '">' + esc(firstRow.mode) + '</span></td>';
-    html += '<td class="perk-cell">' + perkCell(firstRow.col1) + '</td>';
-    html += '<td class="perk-cell">' + perkCell(firstRow.col2) + '</td>';
-    html += '<td class="perk-cell">' + perkCell(firstRow.col3) + '</td>';
-    html += '<td class="perk-cell">' + perkCell(firstRow.col4) + '</td>';
-    html += '<td>' + resultPill(firstRow.result) + '</td>';
-    html += '</tr>';
+    html += '<tr class="pair-start"' + rowAttrs + '>' + sharedCells;
+    html += '<td><span class="mode-badge mode-' + (pve ? 'pve' : 'pvp') + '">' + (pve ? 'PvE' : 'PvP') + '</span></td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col1) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col2) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col3) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col4) + '</td>';
+    html += '<td>' + resultPill(firstEval.result) + '</td></tr>';
 
     if (bothModes) {
-      html += '<tr class="pair-end"' + sharedAttrs + '>';
-      html += '<td><span class="mode-badge mode-pvp">' + esc(pvp.mode) + '</span></td>';
+      html += '<tr class="pair-end"' + rowAttrs + '>';
+      html += '<td><span class="mode-badge mode-pvp">PvP</span></td>';
       html += '<td class="perk-cell">' + perkCell(pvp.col1) + '</td>';
       html += '<td class="perk-cell">' + perkCell(pvp.col2) + '</td>';
       html += '<td class="perk-cell">' + perkCell(pvp.col3) + '</td>';
       html += '<td class="perk-cell">' + perkCell(pvp.col4) + '</td>';
-      html += '<td>' + resultPill(pvp.result) + '</td>';
-      html += '</tr>';
+      html += '<td>' + resultPill(pvp.result) + '</td></tr>';
     }
   }
 
@@ -1176,7 +1056,7 @@ async function loadArmor() {
     const res = await fetch('/api/armor');
     const raw = await res.json();
     if (!raw.ok) throw new Error(raw.error ?? 'Unknown error');
-    ARMOR_RAW = JSON.parse(JSON.stringify(raw.armorRows));
+    ARMOR_RAW = JSON.parse(JSON.stringify(raw.items));
     armorLoaded = true;
     initArmorLocationFilters();
     renderArmor();
@@ -1194,7 +1074,7 @@ function getArmorRows() {
   // Universal items (className === null: Ghost, Artifact) appear under every class filter
   if (armorClassFilter    !== 'all') rows = rows.filter(r => r.className === armorClassFilter || r.className === null);
   if (armorTypeFilter     !== 'all') rows = rows.filter(r => r.type === armorTypeFilter);
-  if (armorRankFilter     !== 'all') rows = rows.filter(r => r.rank === armorRankFilter);
+  if (armorRankFilter     !== 'all') rows = rows.filter(r => r.evaluation?.rank === armorRankFilter);
   if (armorLocationFilter === 'vault') {
     rows = rows.filter(r => r.location === 'vault');
   } else if (armorLocationFilter !== 'all') {
@@ -1219,7 +1099,13 @@ function getArmorRows() {
 
   rows.sort((a, b) => {
     let av = a[armorSortCol] ?? '', bv = b[armorSortCol] ?? '';
-    if (armorSortCol === 'rank')    { av = ARMOR_RANK_ORDER[a.rank] ?? 9; bv = ARMOR_RANK_ORDER[b.rank] ?? 9; }
+    if (armorSortCol === 'rank') {
+      av = ARMOR_RANK_ORDER[a.evaluation?.rank] ?? 9;
+      bv = ARMOR_RANK_ORDER[b.evaluation?.rank] ?? 9;
+    } else if (armorSortCol === 'quality') {
+      av = a.evaluation?.quality ?? -1;
+      bv = b.evaluation?.quality ?? -1;
+    }
     if (typeof av === 'number') return (av - bv) * armorSortDir;
     return String(av).localeCompare(String(bv)) * armorSortDir;
   });
@@ -1243,8 +1129,8 @@ function renderArmor() {
   const tbody = document.getElementById('armor-tbody');
 
   document.getElementById('armor-stat-total').textContent = rows.length;
-  document.getElementById('armor-stat-s').textContent = rows.filter(r => r.rank === 'S').length;
-  document.getElementById('armor-stat-a').textContent = rows.filter(r => r.rank === 'A').length;
+  document.getElementById('armor-stat-s').textContent = rows.filter(r => r.evaluation?.rank === 'S').length;
+  document.getElementById('armor-stat-a').textContent = rows.filter(r => r.evaluation?.rank === 'A').length;
 
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--text-dim)">No armor found.</td></tr>';
@@ -1259,8 +1145,10 @@ function renderArmor() {
     const icon = r.icon
       ? '<img class="weapon-icon" src="' + esc(r.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
       : '<div class="weapon-icon-placeholder">⬡</div>';
-    const rankKey = r.rank === '—' ? 'none' : r.rank.toLowerCase();
-    tableHtml += '<tr>';
+    const rank    = r.evaluation?.rank    ?? '—';
+    const quality = r.evaluation?.quality ?? null;
+    const rankKey = rank === '—' ? 'none' : rank.toLowerCase();
+    tableHtml += '<tr style="cursor:pointer" data-instanceid="' + esc(r.instanceId ?? '') + '">';
     tableHtml += '<td class="icon-cell">' + icon + '</td>';
     tableHtml += '<td class="name-cell">' + esc(r.name) + '</td>';
     tableHtml += '<td>' + esc(r.type) + '</td>';
@@ -1270,20 +1158,29 @@ function renderArmor() {
     tableHtml += '<td class="armor-stat-cell">' + (r.intellect  || '—') + '</td>';
     tableHtml += '<td class="armor-stat-cell">' + (r.discipline || '—') + '</td>';
     tableHtml += '<td class="armor-stat-cell">' + (r.strength   || '—') + '</td>';
-    tableHtml += '<td class="armor-stat-cell">' + (r.quality !== null ? r.quality + '%' : '—') + '</td>';
-    tableHtml += '<td><span class="rank-badge rank-' + rankKey + '">' + esc(r.rank) + '</span></td>';
+    tableHtml += '<td class="armor-stat-cell">' + (quality !== null ? quality + '%' : '—') + '</td>';
+    tableHtml += '<td><span class="rank-badge rank-' + rankKey + '">' + esc(rank) + '</span></td>';
     tableHtml += '</tr>';
   }
   tbody.innerHTML = tableHtml;
+
+  tbody.querySelectorAll('tr[data-instanceid]').forEach(row => {
+    row.addEventListener('click', () => {
+      const item = findItem(row.dataset.instanceid);
+      if (item) openModal(item);
+    });
+  });
 
   // ── Mobile cards ──────────────────────────────────────────────────────────
   const cardsEl = document.getElementById('armor-cards');
   let cardHtml = '';
   for (const r of rows) {
-    const rankKey    = r.rank === '—' ? 'none' : r.rank.toLowerCase();
-    const isVault    = r.location === 'vault';
-    const locClass   = isVault ? 'loc-vault' : '';
-    const locLabel   = isVault
+    const rank     = r.evaluation?.rank    ?? '—';
+    const quality  = r.evaluation?.quality ?? null;
+    const rankKey  = rank === '—' ? 'none' : rank.toLowerCase();
+    const isVault  = r.location === 'vault';
+    const locClass = isVault ? 'loc-vault' : '';
+    const locLabel = isVault
       ? 'vault'
       : (characters.find(c => c.characterId === r.characterId)?.className ?? 'character');
 
@@ -1294,34 +1191,25 @@ function renderArmor() {
     const subtypeText = r.type + (r.className ? ' · ' + r.className : '');
     const lightText   = r.light !== null ? ' · ⬡ ' + r.light : '';
 
-    cardHtml += '<div class="armor-card">';
+    cardHtml += '<div class="armor-card" data-instanceid="' + esc(r.instanceId ?? '') + '">';
     cardHtml += icon;
     cardHtml += '<div class="armor-card-body">';
-
-    // Header: name + rank badge
     cardHtml += '<div class="armor-card-header">';
     cardHtml += '<span class="armor-card-name">' + esc(r.name) + '</span>';
-    cardHtml += '<span class="rank-badge rank-' + rankKey + '">' + esc(r.rank) + '</span>';
+    cardHtml += '<span class="rank-badge rank-' + rankKey + '">' + esc(rank) + '</span>';
     cardHtml += '</div>';
-
-    // Meta: rarity badge + type·class + light + location
     cardHtml += '<div class="armor-card-meta">';
     cardHtml += '<span class="badge ' + (r.rarity ?? '').toLowerCase() + '">' + esc(r.rarity ?? '—') + '</span>';
     cardHtml += '<span class="armor-card-subtype">' + esc(subtypeText + lightText) + '</span>';
     cardHtml += '<span class="item-card-location ' + locClass + '">' + esc(locLabel) + '</span>';
     cardHtml += '</div>';
-
-    // Stats row
     cardHtml += '<div class="armor-card-stats">';
     cardHtml += '<span class="armor-card-stat">INT <b>' + (r.intellect  || '—') + '</b></span>';
     cardHtml += '<span class="armor-card-stat">DIS <b>' + (r.discipline || '—') + '</b></span>';
     cardHtml += '<span class="armor-card-stat">STR <b>' + (r.strength   || '—') + '</b></span>';
-    if (r.quality !== null) {
-      cardHtml += '<span class="armor-card-quality">' + r.quality + '%</span>';
-    }
+    if (quality !== null) cardHtml += '<span class="armor-card-quality">' + quality + '%</span>';
     cardHtml += '</div>';
 
-    // Tag picker
     if (r.instanceId) {
       const armorTag     = getTag(r.instanceId);
       const armorTagInfo = armorTag ? TAGS[armorTag] : null;
@@ -1335,11 +1223,18 @@ function renderArmor() {
       cardHtml += '<button class="tag-option clear" onclick="setTag(event,\'' + esc(r.instanceId) + '\',null)">❌ Clear</button>';
       cardHtml += '</div></div>';
     }
-
-    cardHtml += '</div>';
-    cardHtml += '</div>';
+    cardHtml += '</div></div>';
   }
   cardsEl.innerHTML = cardHtml;
+
+  cardsEl.querySelectorAll('.armor-card[data-instanceid]').forEach(card => {
+    card.addEventListener('click', e => {
+      if (e.target.closest('.tag-cell')) return; // don't open modal when clicking tag picker
+      const item = findItem(card.dataset.instanceid);
+      if (item) openModal(item);
+    });
+  });
+
   updateLayout();
 }
 
@@ -1352,11 +1247,13 @@ function renderVendorArmorTable(rows) {
   html += '</tr></thead><tbody>';
 
   for (const r of rows) {
+    const rank    = r.evaluation?.rank    ?? '—';
+    const quality = r.evaluation?.quality ?? null;
+    const rankKey = rank === '—' ? 'none' : rank.toLowerCase();
     const icon = r.icon
       ? '<img class="weapon-icon" src="' + esc(r.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
       : '<div class="weapon-icon-placeholder">⬡</div>';
-    const rankKey = r.rank === '—' ? 'none' : r.rank.toLowerCase();
-    html += '<tr>';
+    html += '<tr style="cursor:pointer" data-instanceid="' + esc(r.instanceId ?? '') + '">';
     html += '<td class="icon-cell">' + icon + '</td>';
     html += '<td class="name-cell">' + esc(r.name) + '</td>';
     html += '<td>' + esc(r.type) + '</td>';
@@ -1364,8 +1261,8 @@ function renderVendorArmorTable(rows) {
     html += '<td class="armor-stat-cell">' + (r.intellect  || '—') + '</td>';
     html += '<td class="armor-stat-cell">' + (r.discipline || '—') + '</td>';
     html += '<td class="armor-stat-cell">' + (r.strength   || '—') + '</td>';
-    html += '<td class="armor-stat-cell">' + (r.quality !== null ? r.quality + '%' : '—') + '</td>';
-    html += '<td><span class="rank-badge rank-' + rankKey + '">' + esc(r.rank) + '</span></td>';
+    html += '<td class="armor-stat-cell">' + (quality !== null ? quality + '%' : '—') + '</td>';
+    html += '<td><span class="rank-badge rank-' + rankKey + '">' + esc(rank) + '</span></td>';
     html += '</tr>';
   }
   html += '</tbody></table></div>';

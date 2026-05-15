@@ -138,29 +138,42 @@ function armorRank(quality) {
 
 function extractStats(stub, { intellect: ih, discipline: dh, strength: sh }) {
   const arr = Array.isArray(stub.stats) ? stub.stats : Object.values(stub.stats ?? {});
+  const find = hash => arr.find(s => s.statHash === hash);
   return {
-    intellect:  arr.find(s => s.statHash === ih)?.value ?? 0,
-    discipline: arr.find(s => s.statHash === dh)?.value ?? 0,
-    strength:   arr.find(s => s.statHash === sh)?.value ?? 0,
+    intellect:     find(ih)?.value        ?? 0,
+    discipline:    find(dh)?.value        ?? 0,
+    strength:      find(sh)?.value        ?? 0,
+    intellectMax:  find(ih)?.maximumValue ?? 60,
+    disciplineMax: find(dh)?.maximumValue ?? 60,
+    strengthMax:   find(sh)?.maximumValue ?? 60,
   };
 }
 
 function makeArmorRow(stub, itemData, location, characterId, armorStatHashes) {
-  const slot    = ARMOR_SLOT_NAMES[itemData.bucketTypeHash] ?? 'Unknown';
-  const { intellect, discipline, strength } = extractStats(stub, armorStatHashes);
+  const slot = ARMOR_SLOT_NAMES[itemData.bucketTypeHash] ?? 'Unknown';
+  const { intellect, discipline, strength,
+          intellectMax, disciplineMax, strengthMax } = extractStats(stub, armorStatHashes);
   const quality = calcArmorQuality(intellect, discipline, strength, slot);
+  const rank    = armorRank(quality);
+  const statsList = [
+    { name: 'Intellect',  value: intellect,  max: intellectMax  },
+    { name: 'Discipline', value: discipline, max: disciplineMax },
+    { name: 'Strength',   value: strength,   max: strengthMax   },
+  ].filter(s => s.value > 0);
   return {
-    instanceId:   stub.itemInstanceId,
-    characterId:  characterId ?? null,
-    className:    ARMOR_CLASS_NAMES[itemData.classType] ?? null,
-    icon:         itemData.icon ? `https://www.bungie.net${itemData.icon}` : null,
-    name:         itemData.name,
-    type:         slot,
-    itemTypeName: itemData.itemTypeName,
-    rarity:       TIER_NAMES[itemData.tierType] ?? `Tier${itemData.tierType}`,
-    light:        stub.primaryStat?.value ?? null,
-    intellect, discipline, strength, quality,
-    rank:         armorRank(quality),
+    itemType:    'armor',
+    instanceId:  stub.itemInstanceId,
+    characterId: characterId ?? null,
+    className:   ARMOR_CLASS_NAMES[itemData.classType] ?? null,
+    icon:        itemData.icon ? `https://www.bungie.net${itemData.icon}` : null,
+    name:        itemData.name,
+    type:        slot,
+    rarity:      TIER_NAMES[itemData.tierType] ?? `Tier${itemData.tierType}`,
+    light:       stub.primaryStat?.value ?? null,
+    intellect, discipline, strength,
+    evaluation:  { rank, quality },
+    stats:       statsList,
+    perks:       [],
     location,
   };
 }
@@ -230,6 +243,26 @@ function modeResult(status, isError) {
   if (status === 'close')         return '~ Close';
   if (status === 'not_god_roll')  return '✗ No';
   return '? —';
+}
+
+function buildModeEval(rollEntry, evalResult, byColumn, all, allPossible, curated) {
+  const rollDef = Array.isArray(rollEntry)
+    ? (rollEntry.find(d => d.source === evalResult?.source) ?? rollEntry[0])
+    : rollEntry;
+  const gridMap    = mapGodRollToGridColumns(rollDef, byColumn);
+  const w          = col => rollDef ? (rollDef[col] ?? []) : null;
+  const isError    = hasDefinitionError(rollDef, allPossible);
+  const result     = curated ? '⚙ Curated Roll' : modeResult(evalResult?.status, isError);
+  const resultRank = curated ? 4 : (RESULT_RANK[result] ?? 99);
+  return {
+    result,
+    source:     curated ? null : (evalResult?.source ?? null),
+    col1:       curated ? '—' : colCell(w('col1'), byColumn, all, gridMap['col1'], allPossible),
+    col2:       curated ? '—' : colCell(w('col2'), byColumn, all, gridMap['col2'], allPossible),
+    col3:       curated ? '—' : colCell(w('col3'), byColumn, all, gridMap['col3'], allPossible),
+    col4:       curated ? '—' : colCell(w('col4'), byColumn, all, gridMap['col4'], allPossible),
+    resultRank,
+  };
 }
 
 function buildModalData(stub, itemData, talentGridMap) {
@@ -306,7 +339,7 @@ function buildModalData(stub, itemData, talentGridMap) {
     }
   }
 
-  return { stats, columns };
+  return { stats, perks: columns };
 }
 
 /**
@@ -371,52 +404,35 @@ async function runEvaluation(bungieToken, bungieNetMembershipId, membershipTypeO
   };
   results.sort((a, b) => bestOrder(a) - bestOrder(b) || a.name.localeCompare(b.name));
 
-  // Build flat rows (one per weapon × mode) for the browser
-  const rows = [];
+  // Build one normalized item per weapon with embedded per-mode evaluation
+  const items = [];
   for (const r of results) {
-    for (const mode of ['PvP', 'PvE']) {
-      const rollEntry  = mode === 'PvP' ? PVP[r.name] : PVE[r.name];
-      const evalResult = mode === 'PvP' ? r.evaluation.pvp : r.evaluation.pve;
-      const rollDef    = Array.isArray(rollEntry)
-        ? (rollEntry.find(d => d.source === evalResult.source) ?? rollEntry[0])
-        : rollEntry;
-      const gridMap    = mapGodRollToGridColumns(rollDef, r.byColumn);
-      const w          = col => rollDef ? (rollDef[col] ?? []) : null;
-      const isError    = hasDefinitionError(rollDef, r.allPossible);
-      const result     = modeResult(evalResult.status, isError);
-      const curated    = r.isCurated;
-
-      rows.push({
-        instanceId: r.instanceId,
-        icon:       r.icon ? `https://www.bungie.net${r.icon}` : null,
-        name:       r.name,
-        type:       r.itemTypeName,
-        slot:       r.slot,
-        rarity:     TIER_NAMES[r.tierType]    ?? `Tier${r.tierType}`,
-        damage:     DAMAGE_NAMES[r.damageType] ?? '—',
-        damageRaw:  r.damageType,
-        light:      r.light ?? null,
-        mode,
-        col1:       curated ? '—' : colCell(w('col1'), r.byColumn, r.all, gridMap['col1'], r.allPossible),
-        col2:       curated ? '—' : colCell(w('col2'), r.byColumn, r.all, gridMap['col2'], r.allPossible),
-        col3:       curated ? '—' : colCell(w('col3'), r.byColumn, r.all, gridMap['col3'], r.allPossible),
-        col4:       curated ? '—' : colCell(w('col4'), r.byColumn, r.all, gridMap['col4'], r.allPossible),
-        result:     curated ? '⚙ Curated Roll' : result,
-        source:     curated ? null : (evalResult.source ?? null),
-        resultRank: curated ? 4 : (RESULT_RANK[result] ?? 99),
-        // Transfer metadata — only needed once per weapon, attach to PvP row
-        ...(mode === 'PvP' ? {
-          modalData:      r.modalData,
-          itemHash:       r.itemHash,
-          characterId:    r.characterId,
-          transferStatus: r.transferStatus,
-          location:       r.location,
-        } : {}),
-      });
-    }
+    const { stats, perks } = r.modalData;
+    items.push({
+      itemType:       'weapon',
+      instanceId:     r.instanceId,
+      itemHash:       r.itemHash,
+      characterId:    r.characterId,
+      transferStatus: r.transferStatus,
+      location:       r.location,
+      name:           r.name,
+      type:           r.itemTypeName,
+      slot:           r.slot,
+      icon:           r.icon ? `https://www.bungie.net${r.icon}` : null,
+      rarity:         TIER_NAMES[r.tierType]    ?? `Tier${r.tierType}`,
+      damage:         DAMAGE_NAMES[r.damageType] ?? '—',
+      damageRaw:      r.damageType,
+      light:          r.light ?? null,
+      evaluation: {
+        pvp: buildModeEval(PVP[r.name], r.evaluation.pvp, r.byColumn, r.all, r.allPossible, r.isCurated),
+        pve: buildModeEval(PVE[r.name], r.evaluation.pve, r.byColumn, r.all, r.allPossible, r.isCurated),
+      },
+      stats,
+      perks,
+    });
   }
 
-  return { rows, characters, characterIds, platformMembershipId };
+  return { items, characters, characterIds, platformMembershipId };
 }
 
 async function runArmorEvaluation(bungieToken, bungieNetMembershipId, membershipTypeOverride) {
@@ -450,7 +466,7 @@ async function runArmorEvaluation(bungieToken, bungieNetMembershipId, membership
     a.name.localeCompare(b.name)
   );
 
-  return armorRows;
+  return armorRows; // normalized armor items
 }
 
 // ---------------------------------------------------------------------------
@@ -548,49 +564,34 @@ async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap
         const isCurated    = itemData.isCurated ?? false;
         const damageType   = patchedStub.damageType ?? 0;
         const slot         = SLOT_NAMES_V[itemData.bucketTypeHash] ?? 'Unknown';
-        const perks        = extractPerkNames(patchedStub, null, talentGridMap);
+        const perkData     = extractPerkNames(patchedStub, null, talentGridMap);
         const allPossible  = buildAllPossiblePerks(patchedStub, talentGridMap);
-        const evaluation   = evaluateWeapon(name, perks.all);
+        const evaluation   = evaluateWeapon(name, perkData.all);
         const modalData    = buildModalData(patchedStub, itemData, talentGridMap);
 
-        for (const mode of ['PvP', 'PvE']) {
-          const rollEntry  = mode === 'PvP' ? PVP[name] : PVE[name];
-          const evalResult = mode === 'PvP' ? evaluation.pvp : evaluation.pve;
-          const rollDef    = Array.isArray(rollEntry)
-            ? (rollEntry.find(d => d.source === evalResult.source) ?? rollEntry[0])
-            : rollEntry;
-          const gridMap    = mapGodRollToGridColumns(rollDef, perks.byColumn);
-          const w          = col => rollDef ? (rollDef[col] ?? []) : null;
-          const isError    = hasDefinitionError(rollDef, allPossible);
-          const result     = modeResult(evalResult.status, isError);
-          const curated    = isCurated;
-
-          rows.push({
-            instanceId,
-            icon:       icon ? `https://www.bungie.net${icon}` : null,
-            name,
-            type:       itemTypeName,
-            slot,
-            rarity:     TIER_NAMES[tierType]    ?? `Tier${tierType}`,
-            damage:     DAMAGE_NAMES[damageType] ?? '—',
-            damageRaw:  damageType,
-            light:      null, // vendor items don't have meaningful light levels
-            mode,
-            col1:       curated ? '—' : colCell(w('col1'), perks.byColumn, perks.all, gridMap['col1'], allPossible),
-            col2:       curated ? '—' : colCell(w('col2'), perks.byColumn, perks.all, gridMap['col2'], allPossible),
-            col3:       curated ? '—' : colCell(w('col3'), perks.byColumn, perks.all, gridMap['col3'], allPossible),
-            col4:       curated ? '—' : colCell(w('col4'), perks.byColumn, perks.all, gridMap['col4'], allPossible),
-            result:     curated ? '⚙ Curated Roll' : result,
-            source:     curated ? null : (evalResult.source ?? null),
-            resultRank: curated ? 4 : (RESULT_RANK[result] ?? 99),
-            modalData:  mode === 'PvP' ? modalData : undefined,
-          });
-        }
+        rows.push({
+          itemType:     'weapon',
+          isVendorItem: true,
+          instanceId,
+          name,
+          type:     itemTypeName,
+          slot,
+          icon:     icon ? `https://www.bungie.net${icon}` : null,
+          rarity:   TIER_NAMES[tierType]    ?? `Tier${tierType}`,
+          damage:   DAMAGE_NAMES[damageType] ?? '—',
+          damageRaw: damageType,
+          light:    null,
+          evaluation: {
+            pvp: buildModeEval(PVP[name], evaluation.pvp, perkData.byColumn, perkData.all, allPossible, isCurated),
+            pve: buildModeEval(PVE[name], evaluation.pve, perkData.byColumn, perkData.all, allPossible, isCurated),
+          },
+          stats: modalData.stats,
+          perks: modalData.perks,
+        });
       }
     }
 
     // Collect armor sale items
-    const armorRows = [];
     if (available) {
       for (const cat of vd?.saleItemCategories ?? []) {
         for (const si of cat.saleItems ?? []) {
@@ -598,24 +599,33 @@ async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap
           if (!stub) continue;
           const itemData = armorDataMap.get(stub.itemHash);
           if (!itemData || !ARMOR_BUCKET_SET.has(itemData.bucketTypeHash ?? 0)) continue;
-          const slot                           = ARMOR_SLOT_NAMES[itemData.bucketTypeHash] ?? 'Unknown';
-          const { intellect, discipline, strength } = extractStats(stub, armorStatHashes);
-          const quality                        = calcArmorQuality(intellect, discipline, strength, slot);
-          armorRows.push({
+          const slot = ARMOR_SLOT_NAMES[itemData.bucketTypeHash] ?? 'Unknown';
+          const { intellect, discipline, strength,
+                  intellectMax, disciplineMax, strengthMax } = extractStats(stub, armorStatHashes);
+          const quality = calcArmorQuality(intellect, discipline, strength, slot);
+          const rank    = armorRank(quality);
+          rows.push({
+            itemType:     'armor',
+            isVendorItem: true,
             instanceId:   `vendor-armor-${vendor.hash}-${stub.itemHash}`,
             icon:         itemData.icon ? `https://www.bungie.net${itemData.icon}` : null,
             name:         itemData.name,
             type:         slot,
-            itemTypeName: itemData.itemTypeName,
             rarity:       TIER_NAMES[itemData.tierType] ?? `Tier${itemData.tierType}`,
-            intellect, discipline, strength, quality,
-            rank:         armorRank(quality),
+            intellect, discipline, strength,
+            evaluation:   { rank, quality },
+            stats: [
+              { name: 'Intellect',  value: intellect,  max: intellectMax  },
+              { name: 'Discipline', value: discipline, max: disciplineMax },
+              { name: 'Strength',   value: strength,   max: strengthMax   },
+            ].filter(s => s.value > 0),
+            perks: [],
           });
         }
       }
     }
 
-    vendorSections.push({ vendor, rows, armorRows, available });
+    vendorSections.push({ vendor, items: rows, available });
   }
 
   return vendorSections;
@@ -805,10 +815,10 @@ app.post('/auth/logout', (req, res) => {
 
 app.get('/api/inventory', requireAuth, async (req, res) => {
   try {
-    const { rows, characters, characterIds, platformMembershipId } = await runEvaluation(
+    const { items, characters, characterIds, platformMembershipId } = await runEvaluation(
       req.token.access_token, req.token.membership_id, req.membershipType
     );
-    res.json({ ok: true, rows, characters, characterIds, platformMembershipId });
+    res.json({ ok: true, items, characters, characterIds, platformMembershipId });
   } catch (err) {
     console.error('[api/inventory] Error:', err);
     res.status(500).json({ ok: false, error: err.message });
@@ -831,10 +841,10 @@ app.get('/api/vendors', requireAuth, async (req, res) => {
 
 app.get('/api/armor', requireAuth, async (req, res) => {
   try {
-    const armorRows = await runArmorEvaluation(
+    const items = await runArmorEvaluation(
       req.token.access_token, req.token.membership_id, req.membershipType
     );
-    res.json({ ok: true, armorRows });
+    res.json({ ok: true, items });
   } catch (err) {
     console.error('[api/armor] Error:', err);
     res.status(500).json({ ok: false, error: err.message });
