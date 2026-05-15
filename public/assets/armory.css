@@ -641,11 +641,8 @@ footer { padding: 24px 40px; border-top: 1px solid var(--border); font-family: '
 }
 
 /* ── Weapon/armor cards (mobile table replacement) ── */
+/* Visibility is controlled by JS updateLayout() — display:none is the default */
 #weapon-cards, #armor-cards { display: none; padding: 0 12px 32px; }
-
-@media (max-width: 640px) {
-    #weapon-cards, #armor-cards { display: block; }
-}
 
 .weapon-card {
     display: flex;

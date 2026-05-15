@@ -502,6 +502,8 @@ function render() {
   document.getElementById('stat-total').textContent = pairs.length;
   document.getElementById('stat-god').textContent   = pairs.filter(p => Object.values(p).some(r => r.result.includes('GOD'))).length;
   document.getElementById('stat-close').textContent = pairs.filter(p => Object.values(p).some(r => r.result.includes('Close'))).length;
+
+  updateLayout();
 }
 
 document.querySelectorAll('th[data-col]').forEach(th => {
@@ -1149,12 +1151,16 @@ function getArmorRows() {
   return rows;
 }
 
-function updateArmorLayout() {
-  const isMobile  = window.innerWidth <= 640;
-  const cards     = document.getElementById('armor-cards');
-  const tableWrap = document.querySelector('#tab-armor .table-wrap');
-  if (cards)     cards.style.display     = isMobile ? 'block' : 'none';
-  if (tableWrap) tableWrap.style.display = isMobile ? 'none'  : '';
+function updateLayout() {
+  const isMobile = window.innerWidth <= 640;
+  const weaponCards  = document.getElementById('weapon-cards');
+  const weaponTable  = document.querySelector('#tab-weapons .table-wrap');
+  const armorCards   = document.getElementById('armor-cards');
+  const armorTable   = document.querySelector('#tab-armor .table-wrap');
+  if (weaponCards) weaponCards.style.display = isMobile ? 'block' : 'none';
+  if (weaponTable) weaponTable.style.display  = isMobile ? 'none'  : '';
+  if (armorCards)  armorCards.style.display   = isMobile ? 'block' : 'none';
+  if (armorTable)  armorTable.style.display   = isMobile ? 'none'  : '';
 }
 
 function renderArmor() {
@@ -1168,7 +1174,7 @@ function renderArmor() {
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--text-dim)">No armor found.</td></tr>';
     document.getElementById('armor-cards').innerHTML = '';
-    updateArmorLayout();
+    updateLayout();
     return;
   }
 
@@ -1240,7 +1246,7 @@ function renderArmor() {
     cardHtml += '</div>';
   }
   cardsEl.innerHTML = cardHtml;
-  updateArmorLayout();
+  updateLayout();
 }
 
 function renderVendorArmorTable(rows) {
@@ -1272,9 +1278,7 @@ function renderVendorArmorTable(rows) {
   return html;
 }
 
-window.addEventListener('resize', () => {
-  if (armorLoaded) updateArmorLayout();
-});
+window.addEventListener('resize', updateLayout);
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 (async () => {
