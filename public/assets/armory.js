@@ -19,6 +19,7 @@ let armorClassFilter     = 'all';
 let armorTypeFilter      = 'all';
 let armorRankFilter      = 'all';
 let armorLocationFilter  = 'all';
+let armorTagFilter       = 'all';
 let armorSortCol         = 'rank';
 let armorSortDir         = 1;
 
@@ -583,8 +584,9 @@ function setTag(e, instanceId, tagValue) {
   const dd = document.getElementById('td-' + instanceId);
   if (dd) dd.classList.remove('open');
   openDropdownId = null;
-  // Re-render table and update modal tag if open
-  render();
+  // Re-render the active tab and update modal tag if open
+  if (activeTab === 'armor') renderArmor();
+  else render();
   if (document.getElementById('modal-backdrop').classList.contains('open')) {
     renderModalTag(instanceId);
   }
@@ -1130,6 +1132,7 @@ document.querySelectorAll('.armor-filter-btn').forEach(btn => {
     if (group === 'type')     armorTypeFilter     = val;
     if (group === 'rank')     armorRankFilter     = val;
     if (group === 'location') armorLocationFilter = val;
+    if (group === 'tag')      armorTagFilter      = val;
     if (armorLoaded) renderArmor();
   });
 });
@@ -1193,6 +1196,12 @@ function getArmorRows() {
       r.type.toLowerCase().includes(q) ||
       (r.className ?? '').toLowerCase().includes(q)
     );
+  }
+
+  if (armorTagFilter !== 'all') {
+    const tags = loadTags();
+    if (armorTagFilter === 'none') rows = rows.filter(r => !tags[r.instanceId]);
+    else                           rows = rows.filter(r => tags[r.instanceId] === armorTagFilter);
   }
 
   rows.sort((a, b) => {
@@ -1298,6 +1307,21 @@ function renderArmor() {
       cardHtml += '<span class="armor-card-quality">' + r.quality + '%</span>';
     }
     cardHtml += '</div>';
+
+    // Tag picker
+    if (r.instanceId) {
+      const armorTag     = getTag(r.instanceId);
+      const armorTagInfo = armorTag ? TAGS[armorTag] : null;
+      cardHtml += '<div class="tag-cell" style="align-self:flex-start;padding-top:4px">';
+      cardHtml += '<span class="tag-pill ' + (armorTagInfo ? armorTagInfo.cls : '') + '" onclick="openTagDropdown(event,\'' + esc(r.instanceId) + '\')">';
+      cardHtml += (armorTagInfo ? esc(armorTagInfo.label) : '+ Tag') + '</span>';
+      cardHtml += '<div class="tag-dropdown" id="td-' + esc(r.instanceId) + '">';
+      cardHtml += Object.entries(TAGS).map(([val, info]) =>
+        '<button class="tag-option' + (armorTag === val ? ' active' : '') + '" onclick="setTag(event,\'' + esc(r.instanceId) + '\',\'' + val + '\')">' + esc(info.label) + '</button>'
+      ).join('');
+      cardHtml += '<button class="tag-option clear" onclick="setTag(event,\'' + esc(r.instanceId) + '\',null)">❌ Clear</button>';
+      cardHtml += '</div></div>';
+    }
 
     cardHtml += '</div>';
     cardHtml += '</div>';
