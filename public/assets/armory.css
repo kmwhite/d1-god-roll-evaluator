@@ -599,8 +599,8 @@ footer { padding: 24px 40px; border-top: 1px solid var(--border); font-family: '
         flex-shrink: 0;
         padding: 4px 8px;
     }
-    /* Hide verbose filter groups on mobile — keep Result, Mode, Tag */
-    .filter-group:nth-child(n+4) { display: none; }
+    /* Hide verbose weapon filter groups on mobile — keep Result, Mode, Tag */
+    #controls-row .filter-group:nth-child(n+4) { display: none; }
     .filter-label { display: none; }
 
     /* Stats bar */
