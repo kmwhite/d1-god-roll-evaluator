@@ -191,11 +191,11 @@
               <button class="armor-filter-btn" data-armor="type" data-val="Ghost">Ghost</button>
               <button class="armor-filter-btn" data-armor="type" data-val="Artifact">Artifact</button>
             </div>
-            <div class="filter-group">
+            <div class="filter-group" id="armor-location-filter-group">
               <span class="filter-label">Location:</span>
               <button class="armor-filter-btn active" data-armor="location" data-val="all">All</button>
-              <button class="armor-filter-btn" data-armor="location" data-val="character">Character</button>
               <button class="armor-filter-btn" data-armor="location" data-val="vault">Vault</button>
+              <!-- Per-character buttons injected by initArmorLocationFilters() -->
             </div>
             <div class="filter-group">
               <span class="filter-label">Rank:</span>

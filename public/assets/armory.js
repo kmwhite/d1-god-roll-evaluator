@@ -466,10 +466,19 @@ function render() {
     // Body
     cardHtml += '<div class="weapon-card-body">';
     cardHtml += '<div class="weapon-card-name">' + esc(rep.name) + '</div>';
+    const weaponMeta     = transferMeta[iid];
+    const weaponLoc      = weaponMeta?.location;
+    const weaponIsVault  = weaponLoc === 2;
+    const weaponLocLabel = weaponIsVault
+      ? 'vault'
+      : (characters.find(c => c.characterId === weaponMeta?.characterId)?.className ?? null);
+    const weaponLocClass = weaponIsVault ? 'loc-vault' : '';
+
     cardHtml += '<div class="weapon-card-meta">';
     cardHtml += '<span class="badge ' + rep.rarity.toLowerCase() + '">' + esc(rep.rarity) + '</span>';
     cardHtml += '<span class="damage-dot ' + damageClass + '">' + esc(rep.damage) + '</span>';
     if (rep.light) cardHtml += '<span class="light-val" style="font-size:11px">⬡ ' + rep.light + '</span>';
+    if (weaponLocLabel) cardHtml += '<span class="item-card-location ' + weaponLocClass + '">' + esc(weaponLocLabel) + '</span>';
     cardHtml += '</div>';
     cardHtml += '<div class="weapon-card-pills">';
     if (pve) cardHtml += resultPill(pve.result) + ' ';
@@ -1117,6 +1126,27 @@ document.querySelectorAll('.armor-filter-btn').forEach(btn => {
   });
 });
 
+function initArmorLocationFilters() {
+  const group = document.getElementById('armor-location-filter-group');
+  if (!group) return;
+  group.querySelectorAll('.armor-filter-btn[data-generated]').forEach(b => b.remove());
+  for (const char of characters) {
+    const btn = document.createElement('button');
+    btn.className = 'armor-filter-btn';
+    btn.dataset.armor = 'location';
+    btn.dataset.val = char.characterId;
+    btn.dataset.generated = '1';
+    btn.textContent = char.className;
+    group.appendChild(btn);
+    btn.addEventListener('click', () => {
+      group.querySelectorAll('.armor-filter-btn[data-armor="location"]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      armorLocationFilter = char.characterId;
+      if (armorLoaded) renderArmor();
+    });
+  }
+}
+
 async function loadArmor() {
   const tbody = document.getElementById('armor-tbody');
   tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--text-dim)">Loading armor…</td></tr>';
@@ -1126,6 +1156,7 @@ async function loadArmor() {
     if (!raw.ok) throw new Error(raw.error ?? 'Unknown error');
     ARMOR_RAW = JSON.parse(JSON.stringify(raw.armorRows));
     armorLoaded = true;
+    initArmorLocationFilters();
     renderArmor();
   } catch (err) {
     tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:#c06060">Failed to load armor: ' + esc(err.message) + '</td></tr>';
@@ -1140,7 +1171,12 @@ function getArmorRows() {
   if (armorClassFilter    !== 'all') rows = rows.filter(r => r.className === armorClassFilter || r.className === null);
   if (armorTypeFilter     !== 'all') rows = rows.filter(r => r.type === armorTypeFilter);
   if (armorRankFilter     !== 'all') rows = rows.filter(r => r.rank === armorRankFilter);
-  if (armorLocationFilter !== 'all') rows = rows.filter(r => r.location === armorLocationFilter);
+  if (armorLocationFilter === 'vault') {
+    rows = rows.filter(r => r.location === 'vault');
+  } else if (armorLocationFilter !== 'all') {
+    // armorLocationFilter is a characterId string
+    rows = rows.filter(r => r.characterId === armorLocationFilter);
+  }
 
   rows.sort((a, b) => {
     let av = a[armorSortCol] ?? '', bv = b[armorSortCol] ?? '';
@@ -1205,8 +1241,12 @@ function renderArmor() {
   const cardsEl = document.getElementById('armor-cards');
   let cardHtml = '';
   for (const r of rows) {
-    const rankKey  = r.rank === '—' ? 'none' : r.rank.toLowerCase();
-    const locClass = r.location === 'vault' ? 'loc-vault' : '';
+    const rankKey    = r.rank === '—' ? 'none' : r.rank.toLowerCase();
+    const isVault    = r.location === 'vault';
+    const locClass   = isVault ? 'loc-vault' : '';
+    const locLabel   = isVault
+      ? 'vault'
+      : (characters.find(c => c.characterId === r.characterId)?.className ?? 'character');
 
     const icon = r.icon
       ? '<img class="weapon-icon" src="' + esc(r.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
@@ -1229,7 +1269,7 @@ function renderArmor() {
     cardHtml += '<div class="armor-card-meta">';
     cardHtml += '<span class="badge ' + (r.rarity ?? '').toLowerCase() + '">' + esc(r.rarity ?? '—') + '</span>';
     cardHtml += '<span class="armor-card-subtype">' + esc(subtypeText + lightText) + '</span>';
-    cardHtml += '<span class="armor-card-location ' + locClass + '">' + esc(r.location) + '</span>';
+    cardHtml += '<span class="item-card-location ' + locClass + '">' + esc(locLabel) + '</span>';
     cardHtml += '</div>';
 
     // Stats row
