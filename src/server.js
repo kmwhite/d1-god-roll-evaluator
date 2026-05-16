@@ -913,6 +913,7 @@ app.post('/api/transfer', requireAuth, async (req, res) => {
   try {
     const body = {
       membershipType:    req.membershipType,
+      itemReferenceHash: itemHash,
       itemId:            itemId,
       stackSize:         1,
       characterId:       characterId,
@@ -957,6 +958,7 @@ app.post('/api/equip', requireAuth, async (req, res) => {
   try {
     const body = {
       membershipType: req.membershipType,
+      itemId:         itemId,
       characterId:    characterId,
     };
 
