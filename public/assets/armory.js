@@ -181,15 +181,21 @@ function tabLoadingHtml(msg) {
     + '<div class="tab-loading-text">' + esc(msg) + '</div></div>';
 }
 
-function perkCell(val) {
+function perkCell(val, colPerks) {
   if (!val || val === '—') return '<span class="perk-na">—</span>';
   if (val.startsWith('✓')) return '<span class="perk-hit">' + esc(val.slice(2)) + '</span>';
   if (val.startsWith('✗')) {
     const wantStart = val.indexOf('want: ');
     const hasStart  = val.indexOf('has: ');
     const want = wantStart !== -1 ? val.slice(wantStart + 6, hasStart !== -1 ? val.lastIndexOf(';', hasStart) : undefined).trim() : '';
-    const has  = hasStart  !== -1 ? val.slice(hasStart + 5).trim() : '';
-    return '<span class="perk-miss"><span class="want">want: ' + esc(want) + '</span> <span class="has">has: ' + esc(has) + '</span></span>';
+    let hasContent;
+    if (colPerks?.options?.length) {
+      const rolled = colPerks.options.filter(o => o.isRolled).map(o => esc(o.name));
+      hasContent = rolled.length > 0 ? "['" + rolled.join("', '") + "']" : '(not rolled)';
+    } else {
+      hasContent = esc(hasStart !== -1 ? val.slice(hasStart + 5).trim() : '');
+    }
+    return '<span class="perk-miss"><span class="want">want: ' + esc(want) + '</span><br><span class="has">has: ' + hasContent + '</span></span>';
   }
   return esc(val);
 }
@@ -295,13 +301,14 @@ function render() {
       + '<td ' + rowspan + '><span class="light-val">' + (item.light !== null ? item.light : '—') + '</span></td>';
 
     const modeLabel = pve ? 'PvE' : 'PvP';
+    const perkCols  = (item.perks ?? []).slice().sort((a, b) => a.colIndex - b.colIndex);
     html += '<tr class="pair-start"' + rowAttrs + '>';
     html += sharedCells;
     html += '<td><span class="mode-badge mode-' + modeLabel.toLowerCase() + '">' + modeLabel + '</span></td>';
-    html += '<td class="perk-cell">' + perkCell(firstEval.col1) + '</td>';
-    html += '<td class="perk-cell">' + perkCell(firstEval.col2) + '</td>';
-    html += '<td class="perk-cell">' + perkCell(firstEval.col3) + '</td>';
-    html += '<td class="perk-cell">' + perkCell(firstEval.col4) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col1, perkCols[0]) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col2, perkCols[1]) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col3, perkCols[2]) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col4, perkCols[3]) + '</td>';
     html += '<td>' + resultPill(firstEval.result) + '</td>';
     html += renderTagCell(iid, rowspan);
     html += '</tr>';
@@ -309,10 +316,10 @@ function render() {
     if (bothModes) {
       html += '<tr class="pair-end"' + rowAttrs + '>';
       html += '<td><span class="mode-badge mode-pvp">PvP</span></td>';
-      html += '<td class="perk-cell">' + perkCell(pvp.col1) + '</td>';
-      html += '<td class="perk-cell">' + perkCell(pvp.col2) + '</td>';
-      html += '<td class="perk-cell">' + perkCell(pvp.col3) + '</td>';
-      html += '<td class="perk-cell">' + perkCell(pvp.col4) + '</td>';
+      html += '<td class="perk-cell">' + perkCell(pvp.col1, perkCols[0]) + '</td>';
+      html += '<td class="perk-cell">' + perkCell(pvp.col2, perkCols[1]) + '</td>';
+      html += '<td class="perk-cell">' + perkCell(pvp.col3, perkCols[2]) + '</td>';
+      html += '<td class="perk-cell">' + perkCell(pvp.col4, perkCols[3]) + '</td>';
       html += '<td>' + resultPill(pvp.result) + '</td>';
       html += '</tr>';
     }
@@ -861,21 +868,22 @@ function renderVendorTable(items) {
       + '<td' + rowspan + '><span class="badge ' + (item.rarity ?? '').toLowerCase() + '">' + esc(item.rarity ?? '—') + '</span></td>'
       + '<td' + rowspan + '><span class="damage-dot ' + damageClass + '">' + esc(item.damage ?? '—') + '</span></td>';
 
+    const perkCols  = (item.perks ?? []).slice().sort((a, b) => a.colIndex - b.colIndex);
     html += '<tr class="pair-start"' + rowAttrs + '>' + sharedCells;
     html += '<td><span class="mode-badge mode-' + (pve ? 'pve' : 'pvp') + '">' + (pve ? 'PvE' : 'PvP') + '</span></td>';
-    html += '<td class="perk-cell">' + perkCell(firstEval.col1) + '</td>';
-    html += '<td class="perk-cell">' + perkCell(firstEval.col2) + '</td>';
-    html += '<td class="perk-cell">' + perkCell(firstEval.col3) + '</td>';
-    html += '<td class="perk-cell">' + perkCell(firstEval.col4) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col1, perkCols[0]) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col2, perkCols[1]) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col3, perkCols[2]) + '</td>';
+    html += '<td class="perk-cell">' + perkCell(firstEval.col4, perkCols[3]) + '</td>';
     html += '<td>' + resultPill(firstEval.result) + '</td></tr>';
 
     if (bothModes) {
       html += '<tr class="pair-end"' + rowAttrs + '>';
       html += '<td><span class="mode-badge mode-pvp">PvP</span></td>';
-      html += '<td class="perk-cell">' + perkCell(pvp.col1) + '</td>';
-      html += '<td class="perk-cell">' + perkCell(pvp.col2) + '</td>';
-      html += '<td class="perk-cell">' + perkCell(pvp.col3) + '</td>';
-      html += '<td class="perk-cell">' + perkCell(pvp.col4) + '</td>';
+      html += '<td class="perk-cell">' + perkCell(pvp.col1, perkCols[0]) + '</td>';
+      html += '<td class="perk-cell">' + perkCell(pvp.col2, perkCols[1]) + '</td>';
+      html += '<td class="perk-cell">' + perkCell(pvp.col3, perkCols[2]) + '</td>';
+      html += '<td class="perk-cell">' + perkCell(pvp.col4, perkCols[3]) + '</td>';
       html += '<td>' + resultPill(pvp.result) + '</td></tr>';
     }
   }
