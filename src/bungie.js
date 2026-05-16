@@ -21,6 +21,9 @@ const MANIFEST_DB    = path.join(CACHE_DIR, 'manifest.content');
 const BASE        = 'https://www.bungie.net/Platform';
 const BUNGIE_ROOT = 'https://www.bungie.net';
 
+// D1 class enumeration
+const CLASS_NAMES = { 0: 'Titan', 1: 'Hunter', 2: 'Warlock' };
+
 // D1 weapon bucket hashes
 const WEAPON_BUCKET_HASHES = new Set([
   1498876634, // Primary Weapons
@@ -38,6 +41,13 @@ const ARMOR_BUCKET_HASHES = new Set([
   434908299,  // Artifact
   4023194814, // Ghost Shell
 ]);
+
+// D1 race hashes — only 3 races exist
+const RACE_HASHES = {
+  898834093:  'Exo',
+  2803282938: 'Awoken',
+  3887404748: 'Human',
+};
 
 // ---------------------------------------------------------------------------
 // Core HTTP helper
@@ -257,15 +267,6 @@ export async function getCharacterIds(membershipType, membershipId, apiKey, acce
   );
   return (data.data?.characters ?? []).map((c) => c.characterBase.characterId);
 }
-
-const CLASS_NAMES = { 0: 'Titan', 1: 'Hunter', 2: 'Warlock' };
-
-// D1 race hashes — only 3 races exist
-const RACE_HASHES = {
-  898834093:  'Exo',
-  2803282938: 'Awoken',
-  3887404748: 'Human',
-};
 
 /**
  * Fetch character IDs alongside display info (class, race, emblem).
