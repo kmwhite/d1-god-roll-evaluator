@@ -717,7 +717,8 @@ function openModal(item) {
       const label = 'Column ' + (colsSeen.indexOf(col.colIndex) + 1);
       html += '<div class="perk-column"><div class="perk-column-label">' + esc(label) + '</div>';
       for (const opt of col.options) {
-        html += '<div class="perk-option' + (opt.isRolled ? ' is-rolled' : '') + '">';
+        const optCls = opt.isActive ? ' is-active' : opt.isRolled ? ' is-rolled' : '';
+        html += '<div class="perk-option' + optCls + '">';
         html += opt.icon ? '<img class="perk-icon" src="' + esc(opt.icon) + '" alt="" onerror="iconError(this,\'perk-icon-placeholder\')">' : '<div class="perk-icon-placeholder"></div>';
         html += '<div class="perk-name">' + esc(opt.name) + '</div>';
         if (opt.desc) html += '<div class="perk-tooltip">' + esc(opt.desc) + '</div>';
