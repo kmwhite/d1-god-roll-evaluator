@@ -57,9 +57,15 @@
     <div id="app">
       <!-- Tab bar -->
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="weapons">Weapons</button>
-        <button class="tab-btn" data-tab="armor">Armor</button>
-        <button class="tab-btn" data-tab="vendors">Vendors</button>
+        <button class="tab-btn active" data-tab="weapons">
+          <i class="fa-duotone fa-solid fa-gun"></i> Weapons
+        </button>
+        <button class="tab-btn" data-tab="armor">
+          <i class="fa-duotone fa-solid fa-user-astronaut"></i> Armor
+        </button>
+        <button class="tab-btn" data-tab="vendors">
+          <i class="fa-duotone fa-solid fa-store"></i> Vendors
+        </button>
       </div>
 
       <!-- Weapons tab -->
@@ -69,12 +75,12 @@
             <div class="filter-group">
               <span class="filter-label">Result:</span>
               <button class="filter-btn active" data-filter="all">All</button>
-              <button class="filter-btn" data-filter="god-roll">★ God Rolls</button>
-              <button class="filter-btn" data-filter="close">~ Close</button>
-              <button class="filter-btn" data-filter="no">✗ No</button>
-              <button class="filter-btn" data-filter="curated">⚙ Curated</button>
-              <button class="filter-btn" data-filter="unknown">? Unknown</button>
-              <button class="filter-btn" data-filter="error">⚠ Error</button>
+              <button class="filter-btn" data-filter="god-roll"><i class="fa-solid fa-star"></i> God Rolls</button>
+              <button class="filter-btn" data-filter="close"><i class="fa-duotone fa-solid fa-star-half-stroke"></i> Close</button>
+              <button class="filter-btn" data-filter="no"><i class="fa-solid fa-xmark"></i> No</button>
+              <button class="filter-btn" data-filter="curated"><i class="fa-duotone fa-solid fa-list-check"></i> Curated</button>
+              <button class="filter-btn" data-filter="unknown"><i class="fa-duotone fa-solid fa-circle-question"></i> Unknown</button>
+              <button class="filter-btn" data-filter="error"><i class="fa-duotone fa-solid fa-triangle-exclamation"></i> Error</button>
             </div>
             <div class="filter-group">
               <span class="filter-label">Mode:</span>

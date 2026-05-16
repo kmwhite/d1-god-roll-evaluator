@@ -25,6 +25,24 @@ let armorSortDir         = 1;
 
 const DAMAGE_CLASS = { 0:'kinetic', 1:'kinetic', 2:'arc', 3:'solar', 4:'void' };
 
+const RESULT_ICON = {
+  'god-roll': '<i class="fa-solid fa-star"></i>',
+  'close':    '<i class="fa-duotone fa-solid fa-star-half-stroke"></i>',
+  'no':       '<i class="fa-solid fa-xmark"></i>',
+  'curated':  '<i class="fa-duotone fa-solid fa-list-check"></i>',
+  'unknown':  '<i class="fa-duotone fa-solid fa-circle-question"></i>',
+  'error':    '<i class="fa-duotone fa-solid fa-triangle-exclamation"></i>',
+};
+
+const RESULT_LABEL = {
+  'god-roll': 'God Roll',
+  'close':    'Close',
+  'no':       'No',
+  'curated':  'Curated',
+  'unknown':  'Unknown',
+  'error':    'Error',
+};
+
 // ── View switching ─────────────────────────────────────────────────────────────
 function show(id) {
   ['landing','loading-view','error-view','app'].forEach(v => {
@@ -183,7 +201,7 @@ function resultPill(result) {
     : result.includes('Error')       ? 'error'
     : result === '? —'               ? 'unknown'
     : 'no';
-  return '<span class="result-pill ' + cls + '">' + esc(result) + '</span>';
+  return '<span class="result-pill ' + cls + '">' + RESULT_ICON[cls] + ' ' + RESULT_LABEL[cls] + '</span>';
 }
 
 // ── Dynamic filter buttons (static in HTML, wired here) ───────────────────────
@@ -648,9 +666,10 @@ function openModal(item) {
         if (!ev) continue;
         const label      = modeKey === 'pvp' ? 'PvP' : 'PvE';
         const resultText = ev.result ?? '—';
-        const badgeCls   = resultText.includes('GOD') ? 'god' : resultText.includes('Close') ? 'close' : 'no';
+        const pillCls    = resultText.includes('GOD') ? 'god-roll' : resultText.includes('Close') ? 'close' : resultText.includes('Curated') ? 'curated' : resultText.includes('Error') ? 'error' : resultText === '? —' ? 'unknown' : 'no';
+        const badgeCls   = pillCls === 'god-roll' ? 'god' : pillCls;
         html += '<div class="god-roll-mode ' + modeKey + '"><div class="god-roll-mode-title">' + label + '</div>';
-        html += '<div class="god-roll-result-badge ' + badgeCls + '">' + esc(resultText + (ev.source ? ' (' + ev.source + ')' : '')) + '</div>';
+        html += '<div class="god-roll-result-badge ' + badgeCls + '">' + RESULT_ICON[pillCls] + ' ' + esc(resultText + (ev.source ? ' (' + ev.source + ')' : '')) + '</div>';
         html += '<div class="god-roll-col-list">';
         for (const [idx, colVal] of [[1, ev.col1],[2, ev.col2],[3, ev.col3],[4, ev.col4]]) {
           if (!colVal || colVal === '—') continue;

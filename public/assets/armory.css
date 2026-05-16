@@ -569,6 +569,9 @@ footer { padding: 24px 40px; border-top: 1px solid var(--border); font-family: '
 .god-roll-mode.pve .god-roll-result-badge.god   { color: #60a0e0; border-color: #60a0e0; background: rgba(60,120,200,0.1); }
 .god-roll-mode.pve .god-roll-result-badge.close { color: #60c0d0; border-color: #60c0d0; background: rgba(60,180,200,0.08); }
 .god-roll-mode.pve .god-roll-result-badge.no    { color: rgba(60,120,200,0.4); border-color: rgba(60,120,200,0.2); }
+.god-roll-result-badge.curated { color: #8ab898; border-color: #5a8a6a; background: rgba(120,160,120,0.08); }
+.god-roll-result-badge.error   { color: #d09840; border-color: #b07828; background: rgba(180,120,40,0.12); }
+.god-roll-result-badge.unknown { color: var(--border-bright); border-color: var(--border); }
 .god-roll-col-list { display: flex; flex-direction: column; gap: 4px; }
 .god-roll-col-row { display: flex; align-items: baseline; gap: 6px; font-size: 11px; line-height: 1.3; }
 .god-roll-col-label { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--text-dim); flex-shrink: 0; width: 42px; }
