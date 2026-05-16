@@ -9,8 +9,8 @@ let tagFilter    = 'all';
 let modeFilter   = 'all';
 let slotFilter   = 'all'; // Primary / Special / Heavy
 let typeFilter   = 'all'; // Sidearm, Rocket Launcher, etc.
-let rarityFilter = 'all';
-let damageFilter = 'all';
+let rarityFilter = 'all'; // Common, Uncommon, Rare, Legendary, Exotic
+let damageFilter = 'all'; // Kinetic, Arc, Solar, Void
 let searchTerm   = '';
 
 let ARMOR_RAW            = [];
@@ -24,34 +24,6 @@ let armorSortCol         = 'rank';
 let armorSortDir         = 1;
 
 const DAMAGE_CLASS = { 0:'kinetic', 1:'kinetic', 2:'arc', 3:'solar', 4:'void' };
-
-// ── Tag system ────────────────────────────────────────────────────────────────
-const TAGS = {
-  favorite: { label: '⭐ Favorite', cls: 'tag-favorite' },
-  keep:     { label: '👍 Keep',     cls: 'tag-keep'     },
-  upgrade:  { label: '⬆️ Upgrade',  cls: 'tag-upgrade'  },
-  evaluate: { label: '🔍 Evaluate', cls: 'tag-evaluate'  },
-  infuse:   { label: '🔺 Infuse',   cls: 'tag-infuse'   },
-  junk:     { label: '🗑️ Junk',     cls: 'tag-junk'     },
-  archive:  { label: '📦 Archive',  cls: 'tag-archive'  },
-};
-const STORAGE_KEY = 'd1-god-roll-tags';
-
-function loadTags() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}'); }
-  catch { return {}; }
-}
-
-function saveTag(instanceId, tagValue) {
-  const tags = loadTags();
-  if (tagValue) tags[instanceId] = tagValue;
-  else delete tags[instanceId];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tags));
-}
-
-function getTag(instanceId) {
-  return loadTags()[instanceId] ?? null;
-}
 
 // ── View switching ─────────────────────────────────────────────────────────────
 function show(id) {
@@ -181,50 +153,7 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
   loadInventory();
 });
 
-document.getElementById('btn-export-tags').addEventListener('click', () => {
-  const tags = loadTags();
-  const json = JSON.stringify(tags, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = 'd1-armory-tags.json';
-  a.click();
-  URL.revokeObjectURL(url);
-});
-
-document.getElementById('btn-import-tags').addEventListener('click', () => {
-  document.getElementById('import-tags-input').click();
-});
-
-document.getElementById('import-tags-input').addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    try {
-      const imported = JSON.parse(ev.target.result);
-      if (typeof imported !== 'object' || Array.isArray(imported)) {
-        alert('Invalid tag file — expected a JSON object.');
-        return;
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(imported));
-      render();
-    } catch {
-      alert('Failed to parse tag file — make sure it is valid JSON.');
-    } finally {
-      // Reset so the same file can be re-imported if needed
-      e.target.value = '';
-    }
-  };
-  reader.readAsText(file);
-});
-
 // ── Rendering helpers ─────────────────────────────────────────────────────────
-function esc(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
 function iconError(el, cls) {
   el.outerHTML = '<div' + (cls ? ' class="' + cls + '"' : '') + '>⬡</div>';
 }
@@ -330,7 +259,7 @@ function render() {
     const pve        = modeFilter !== 'pvp' ? item.evaluation.pve : null;
     const firstEval  = pve ?? pvp;
     const bothModes  = !!(pvp && pve);
-    const rowspan    = bothModes ? ' rowspan="2"' : '';
+    const rowspan    = bothModes ? 'rowspan="2"' : '';
     const rarityClass = item.rarity.toLowerCase();
     const damageClass = DAMAGE_CLASS[item.damageRaw] ?? item.damage.toLowerCase();
 
@@ -338,26 +267,14 @@ function render() {
       ? '<img class="weapon-icon" src="' + esc(item.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
       : '<div class="weapon-icon-placeholder">⬡</div>';
 
-    const tag     = getTag(iid);
-    const tagInfo = tag ? TAGS[tag] : null;
-    const tagCell = '<td class="tag-cell"' + rowspan + ' data-iid="' + esc(iid) + '">'
-      + '<span class="tag-pill ' + (tagInfo ? tagInfo.cls : '') + '" onclick="openTagDropdown(event,\'' + esc(iid) + '\')">'
-      + (tagInfo ? tagInfo.label : '+ Tag') + '</span>'
-      + '<div class="tag-dropdown" id="td-' + esc(iid) + '">'
-      + Object.entries(TAGS).map(([val, info]) =>
-        '<button class="tag-option' + (tag === val ? ' active' : '') + '" onclick="setTag(event,\'' + esc(iid) + '\',\'' + val + '\')">' + info.label + '</button>'
-      ).join('')
-      + '<button class="tag-option clear" onclick="setTag(event,\'' + esc(iid) + '\',null)">❌ Clear</button>'
-      + '</div></td>';
-
     const rowAttrs = ' style="cursor:pointer" data-instanceid="' + esc(iid) + '"';
     const sharedCells =
       '<td class="icon-cell"' + rowspan + '>' + icon + '</td>'
       + '<td class="name-cell"' + rowspan + '>' + esc(item.name) + '</td>'
-      + '<td' + rowspan + '>' + esc(item.type) + '</td>'
-      + '<td' + rowspan + '><span class="badge ' + rarityClass + '">' + esc(item.rarity) + '</span></td>'
-      + '<td' + rowspan + '><span class="damage-dot ' + damageClass + '">' + esc(item.damage) + '</span></td>'
-      + '<td' + rowspan + '><span class="light-val">' + (item.light !== null ? item.light : '—') + '</span></td>';
+      + '<td ' + rowspan + '>' + esc(item.type) + '</td>'
+      + '<td ' + rowspan + '><span class="badge ' + rarityClass + '">' + esc(item.rarity) + '</span></td>'
+      + '<td ' + rowspan + '><span class="damage-dot ' + damageClass + '">' + esc(item.damage) + '</span></td>'
+      + '<td ' + rowspan + '><span class="light-val">' + (item.light !== null ? item.light : '—') + '</span></td>';
 
     const modeLabel = pve ? 'PvE' : 'PvP';
     html += '<tr class="pair-start"' + rowAttrs + '>';
@@ -368,7 +285,7 @@ function render() {
     html += '<td class="perk-cell">' + perkCell(firstEval.col3) + '</td>';
     html += '<td class="perk-cell">' + perkCell(firstEval.col4) + '</td>';
     html += '<td>' + resultPill(firstEval.result) + '</td>';
-    html += tagCell;
+    html += renderTagCell(iid, rowspan);
     html += '</tr>';
 
     if (bothModes) {
@@ -480,46 +397,6 @@ document.getElementById('search').addEventListener('input', e => {
   else if (activeTab === 'armor' && armorLoaded) renderArmor();
 });
 
-// ── Tag dropdown ──────────────────────────────────────────────────────────────
-let openDropdownId = null;
-
-function openTagDropdown(e, instanceId) {
-  e.stopPropagation();
-  // Close any already-open dropdown
-  if (openDropdownId && openDropdownId !== instanceId) {
-    const prev = document.getElementById('td-' + openDropdownId);
-    if (prev) prev.classList.remove('open');
-  }
-  const dd = document.getElementById('td-' + instanceId);
-  if (!dd) return;
-  const isOpen = dd.classList.contains('open');
-  dd.classList.toggle('open', !isOpen);
-  openDropdownId = isOpen ? null : instanceId;
-}
-
-function setTag(e, instanceId, tagValue) {
-  e.stopPropagation();
-  saveTag(instanceId, tagValue);
-  // Close dropdown
-  const dd = document.getElementById('td-' + instanceId);
-  if (dd) dd.classList.remove('open');
-  openDropdownId = null;
-  // Re-render the active tab and update modal tag if open
-  if (activeTab === 'armor') renderArmor();
-  else render();
-  if (document.getElementById('modal-backdrop').classList.contains('open')) {
-    renderModalTag(instanceId);
-  }
-}
-
-// Close dropdowns when clicking outside
-document.addEventListener('click', () => {
-  if (openDropdownId) {
-    const dd = document.getElementById('td-' + openDropdownId);
-    if (dd) dd.classList.remove('open');
-    openDropdownId = null;
-  }
-});
 // Finds a normalized item by instanceId across weapons, armor, and vendor items.
 function findItem(instanceId) {
   return RAW.find(r => r.instanceId === instanceId)
@@ -719,7 +596,7 @@ function renderModalTag(instanceId) {
   for (const [val, info] of Object.entries(TAGS)) {
     html += '<button class="tag-btn' + (tag === val ? ' active' : '') + '" onclick="setTag(event,\'' + esc(instanceId) + '\',\'' + val + '\')">' + info.label + '</button>';
   }
-  html += '<button class="tag-btn" onclick="setTag(event,\'' + esc(instanceId) + '\',null)" style="color:#c06060">❌ Clear</button>';
+  html += '<button class="tag-btn" onclick="setTag(event,\'' + esc(instanceId) + '\',null)" style="color:#c06060"><i class="fa-duotone fa-solid fa-xmark"></i> Clear</button>';
   html += '</div>';
   container.innerHTML = html;
 }
@@ -1148,6 +1025,7 @@ function renderArmor() {
     const rank    = r.evaluation?.rank    ?? '—';
     const quality = r.evaluation?.quality ?? null;
     const rankKey = rank === '—' ? 'none' : rank.toLowerCase();
+
     tableHtml += '<tr style="cursor:pointer" data-instanceid="' + esc(r.instanceId ?? '') + '">';
     tableHtml += '<td class="icon-cell">' + icon + '</td>';
     tableHtml += '<td class="name-cell">' + esc(r.name) + '</td>';
@@ -1160,6 +1038,7 @@ function renderArmor() {
     tableHtml += '<td class="armor-stat-cell">' + (r.strength   || '—') + '</td>';
     tableHtml += '<td class="armor-stat-cell">' + (quality !== null ? quality + '%' : '—') + '</td>';
     tableHtml += '<td><span class="rank-badge rank-' + rankKey + '">' + esc(rank) + '</span></td>';
+    tableHtml += renderTagCell(r.instanceId);
     tableHtml += '</tr>';
   }
   tbody.innerHTML = tableHtml;

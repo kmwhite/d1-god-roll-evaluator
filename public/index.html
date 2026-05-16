@@ -6,6 +6,7 @@
     <title>D1 God Roll Evaluator</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.2.0/css/all.min.css">
     <link rel="stylesheet" href="/assets/armory.css">
   </head>
   <body>
@@ -84,14 +85,14 @@
             <div class="filter-group">
               <span class="filter-label">Tag:</span>
               <button class="tag-filter-btn active" data-tag="all">All</button>
-              <button class="tag-filter-btn" data-tag="none">🚫 Untagged</button>
-              <button class="tag-filter-btn" data-tag="favorite">⭐ Favorite</button>
-              <button class="tag-filter-btn" data-tag="keep">👍 Keep</button>
-              <button class="tag-filter-btn" data-tag="upgrade">⬆️ Upgrade</button>
-              <button class="tag-filter-btn" data-tag="evaluate">🔍 Evaluate</button>
-              <button class="tag-filter-btn" data-tag="infuse">🔺 Infuse</button>
-              <button class="tag-filter-btn" data-tag="junk">🗑️ Junk</button>
-              <button class="tag-filter-btn" data-tag="archive">📦 Archive</button>
+              <button class="tag-filter-btn" data-tag="none"><i class="fa-duotone fa-solid fa-ban"></i> Untagged</button>
+              <button class="tag-filter-btn" data-tag="favorite"><i class="fa-duotone fa-solid fa-shield-heart"></i> Favorite</button>
+              <button class="tag-filter-btn" data-tag="keep"><i class="fa-duotone fa-solid fa-bookmark"></i> Keep</button>
+              <button class="tag-filter-btn" data-tag="upgrade"><i class="fa-duotone fa-solid fa-arrow-up-right-dots"></i> Upgrade</button>
+              <button class="tag-filter-btn" data-tag="evaluate"><i class="fa-duotone fa-solid fa-magnifying-glass"></i> Evaluate</button>
+              <button class="tag-filter-btn" data-tag="infuse"><i class="fa-duotone fa-solid fa-charging-station"></i> Infuse</button>
+              <button class="tag-filter-btn" data-tag="junk"><i class="fa-duotone fa-solid fa-trash-can"></i> Junk</button>
+              <button class="tag-filter-btn" data-tag="archive"><i class="fa-duotone fa-solid fa-box-archive"></i> Archive</button>
             </div>
             <div class="filter-group">
               <span class="filter-label">Slot:</span>
@@ -200,14 +201,14 @@
             <div class="filter-group">
               <span class="filter-label">Tag:</span>
               <button class="armor-filter-btn active" data-armor="tag" data-val="all">All</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="none">🚫 Untagged</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="favorite">⭐ Favorite</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="keep">👍 Keep</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="upgrade">⬆️ Upgrade</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="evaluate">🔍 Evaluate</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="infuse">🔺 Infuse</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="junk">🗑️ Junk</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="archive">📦 Archive</button>
+              <button class="armor-filter-btn" data-armor="tag" data-val="none"><i class="fa-duotone fa-solid fa-ban"></i> Untagged</button>
+              <button class="armor-filter-btn" data-armor="tag" data-val="favorite"><i class="fa-duotone fa-solid fa-shield-heart"></i> Favorite</button>
+              <button class="armor-filter-btn" data-armor="tag" data-val="keep"><i class="fa-duotone fa-solid fa-bookmark"></i> Keep</button>
+              <button class="armor-filter-btn" data-armor="tag" data-val="upgrade"><i class="fa-duotone fa-solid fa-arrow-up-right-dots"></i> Upgrade</button>
+              <button class="armor-filter-btn" data-armor="tag" data-val="evaluate"><i class="fa-duotone fa-solid fa-magnifying-glass"></i> Evaluate</button>
+              <button class="armor-filter-btn" data-armor="tag" data-val="infuse"><i class="fa-duotone fa-solid fa-charging-station"></i> Infuse</button>
+              <button class="armor-filter-btn" data-armor="tag" data-val="junk"><i class="fa-duotone fa-solid fa-trash-can"></i> Junk</button>
+              <button class="armor-filter-btn" data-armor="tag" data-val="archive"><i class="fa-duotone fa-solid fa-box-archive"></i> Archive</button>
             </div>
             <div class="filter-group">
               <span class="filter-label">Rank:</span>
@@ -241,6 +242,7 @@
                 <th data-acol="strength">STR</th>
                 <th data-acol="quality">Quality</th>
                 <th data-acol="rank">Rank</th>
+                <th data-col="tag">Tag</th>
               </tr>
             </thead>
             <tbody id="armor-tbody"></tbody>
@@ -278,6 +280,8 @@
       </div>
     </div>
 
+    <script src="/assets/helpers.js"></script>
+    <script src="/assets/tagging.js"></script>
     <script src="/assets/armory.js"></script>
   </body>
 </html>
