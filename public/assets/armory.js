@@ -1,47 +1,3 @@
-// ── State ─────────────────────────────────────────────────────────────────────
-let RAW = [];
-let characters = [];
-let characterIds = [];
-let platformMembershipId = null;
-let sortCol = 'result', sortDir = 1;
-let filterMode   = 'all';
-let tagFilter    = 'all';
-let modeFilter   = 'all';
-let slotFilter   = 'all'; // Primary / Special / Heavy
-let typeFilter   = 'all'; // Sidearm, Rocket Launcher, etc.
-let rarityFilter = 'all'; // Common, Uncommon, Rare, Legendary, Exotic
-let damageFilter = 'all'; // Kinetic, Arc, Solar, Void
-let searchTerm   = '';
-
-let ARMOR_RAW            = [];
-let armorLoaded          = false;
-let armorClassFilter     = 'all';
-let armorTypeFilter      = 'all';
-let armorRankFilter      = 'all';
-let armorLocationFilter  = 'all';
-let armorTagFilter       = 'all';
-let armorSortCol         = 'rank';
-let armorSortDir         = 1;
-
-const DAMAGE_CLASS = { 0:'kinetic', 1:'kinetic', 2:'arc', 3:'solar', 4:'void' };
-
-const RESULT_ICON = {
-  'god-roll': '<i class="fa-solid fa-star"></i>',
-  'close':    '<i class="fa-duotone fa-solid fa-star-half-stroke"></i>',
-  'no':       '<i class="fa-solid fa-xmark"></i>',
-  'curated':  '<i class="fa-duotone fa-solid fa-list-check"></i>',
-  'unknown':  '<i class="fa-duotone fa-solid fa-circle-question"></i>',
-  'error':    '<i class="fa-duotone fa-solid fa-triangle-exclamation"></i>',
-};
-
-const RESULT_LABEL = {
-  'god-roll': 'God Roll',
-  'close':    'Close',
-  'no':       'No',
-  'curated':  'Curated',
-  'unknown':  'Unknown',
-  'error':    'Error',
-};
 
 // ── View switching ─────────────────────────────────────────────────────────────
 function show(id) {
@@ -110,15 +66,6 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
 });
 
 // ── Inventory load ─────────────────────────────────────────────────────────────
-const loadingMessages = [
-  'Loading manifest data',
-  'Fetching character inventories',
-  'Fetching vault',
-  'Evaluating rolls',
-  'Building report',
-];
-let loadingMsgIdx = 0;
-let loadingInterval = null;
 
 function startLoadingAnimation() {
   loadingMsgIdx = 0;
@@ -756,8 +703,6 @@ document.getElementById('tbody').addEventListener('click', e => {
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 
-let activeTab = 'weapons';
-let vendorsLoaded = false;
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -781,7 +726,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 // ── Vendor loading ────────────────────────────────────────────────────────────
 
-let vendorItems_ = []; // flat array of all vendor items for findItem() lookup
 
 async function loadVendors() {
   const container = document.getElementById('vendors-container');
@@ -972,7 +916,6 @@ async function loadArmor() {
   }
 }
 
-const ARMOR_RANK_ORDER = { S: 0, A: 1, B: 2, C: 3, D: 4, F: 5, '—': 6 };
 
 function getArmorRows() {
   let rows = [...ARMOR_RAW];
