@@ -181,55 +181,7 @@ function renderArmor() {
   const cardsEl = document.getElementById('armor-cards');
   let cardHtml = '';
   for (const r of rows) {
-    const rank     = r.evaluation?.rank    ?? '—';
-    const quality  = r.evaluation?.quality ?? null;
-    const rankKey  = rank === '—' ? 'none' : rank.toLowerCase();
-    const isVault  = r.location === 'vault';
-    const locClass = isVault ? 'loc-vault' : '';
-    const locLabel = isVault
-      ? 'vault'
-      : (characters.find(c => c.characterId === r.characterId)?.className ?? 'character');
-
-    const icon = r.icon
-      ? '<img class="weapon-icon" src="' + esc(r.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
-      : '<div class="weapon-icon-placeholder">⬡</div>';
-
-    const subtypeText = r.type + (r.className ? ' · ' + r.className : '');
-    const lightText   = r.light !== null ? ' · ⬡ ' + r.light : '';
-
-    cardHtml += '<div class="armor-card" data-instanceid="' + esc(r.instanceId ?? '') + '">';
-    cardHtml += icon;
-    cardHtml += '<div class="armor-card-body">';
-    cardHtml += '<div class="armor-card-header">';
-    cardHtml += '<span class="armor-card-name">' + esc(r.name) + '</span>';
-    cardHtml += '<span class="rank-badge rank-' + rankKey + '">' + esc(rank) + '</span>';
-    cardHtml += '</div>';
-    cardHtml += '<div class="armor-card-meta">';
-    cardHtml += '<span class="badge ' + (r.rarity ?? '').toLowerCase() + '">' + esc(r.rarity ?? '—') + '</span>';
-    cardHtml += '<span class="armor-card-subtype">' + esc(subtypeText + lightText) + '</span>';
-    cardHtml += '<span class="item-card-location ' + locClass + '">' + esc(locLabel) + '</span>';
-    cardHtml += '</div>';
-    cardHtml += '<div class="armor-card-stats">';
-    cardHtml += '<span class="armor-card-stat">INT <b>' + (r.intellect  || '—') + '</b></span>';
-    cardHtml += '<span class="armor-card-stat">DIS <b>' + (r.discipline || '—') + '</b></span>';
-    cardHtml += '<span class="armor-card-stat">STR <b>' + (r.strength   || '—') + '</b></span>';
-    if (quality !== null) cardHtml += '<span class="armor-card-quality">' + quality + '%</span>';
-    cardHtml += '</div>';
-
-    if (r.instanceId) {
-      const armorTag     = getTag(r.instanceId);
-      const armorTagInfo = armorTag ? TAGS[armorTag] : null;
-      cardHtml += '<div class="tag-cell" style="align-self:flex-start;padding-top:4px">';
-      cardHtml += '<span class="tag-pill ' + (armorTagInfo ? armorTagInfo.cls : '') + '" onclick="openTagDropdown(event,\'' + esc(r.instanceId) + '\')">';
-      cardHtml += (armorTagInfo ? esc(armorTagInfo.label) : '+ Tag') + '</span>';
-      cardHtml += '<div class="tag-dropdown" id="td-' + esc(r.instanceId) + '">';
-      cardHtml += Object.entries(TAGS).map(([val, info]) =>
-        '<button class="tag-option' + (armorTag === val ? ' active' : '') + '" onclick="setTag(event,\'' + esc(r.instanceId) + '\',\'' + val + '\')">' + esc(info.label) + '</button>'
-      ).join('');
-      cardHtml += '<button class="tag-option clear" onclick="setTag(event,\'' + esc(r.instanceId) + '\',null)">❌ Clear</button>';
-      cardHtml += '</div></div>';
-    }
-    cardHtml += '</div></div>';
+    cardHtml += renderCard('armor', r, { showTag: true });
   }
   cardsEl.innerHTML = cardHtml;
 
@@ -277,36 +229,9 @@ function renderVendorArmorTable(rows) {
 
 function renderVendorArmorCards(rows) {
   if (!rows.length) return '';
-  let html = '<div class="vendor-cards" style="margin-top:4px">';
-  for (const r of rows) {
-    const rank    = r.evaluation?.rank    ?? '—';
-    const quality = r.evaluation?.quality ?? null;
-    const rankKey = rank === '—' ? 'none' : rank.toLowerCase();
-    const icon = r.icon
-      ? '<img class="weapon-icon" src="' + esc(r.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
-      : '<div class="weapon-icon-placeholder">⬡</div>';
-    html += '<div class="armor-card" style="cursor:pointer" data-instanceid="' + esc(r.instanceId ?? '') + '">';
-    html += icon;
-    html += '<div class="armor-card-body">';
-    html += '<div class="armor-card-header">';
-    html += '<span class="armor-card-name">' + esc(r.name) + '</span>';
-    html += '<span class="rank-badge rank-' + rankKey + '">' + esc(rank) + '</span>';
-    html += '</div>';
-    html += '<div class="armor-card-meta">';
-    html += '<span class="badge ' + (r.rarity ?? '').toLowerCase() + '">' + esc(r.rarity ?? '—') + '</span>';
-    html += '<span class="armor-card-subtype">' + esc(r.type) + '</span>';
-    html += '</div>';
-    html += '<div class="armor-card-stats">';
-    html += '<span class="armor-card-stat">INT <b>' + (r.intellect  || '—') + '</b></span>';
-    html += '<span class="armor-card-stat">DIS <b>' + (r.discipline || '—') + '</b></span>';
-    html += '<span class="armor-card-stat">STR <b>' + (r.strength   || '—') + '</b></span>';
-    if (quality !== null) html += '<span class="armor-card-quality">' + quality + '%</span>';
-    html += '</div>';
-    html += '</div>';
-    html += '</div>';
-  }
-  html += '</div>';
-  return html;
+  return '<div class="vendor-cards" style="margin-top:4px">'
+    + rows.map(r => renderCard('armor', r)).join('')
+    + '</div>';
 }
 
 window.addEventListener('resize', updateLayout);

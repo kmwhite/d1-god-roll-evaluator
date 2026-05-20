@@ -238,37 +238,11 @@ function render() {
   const cardsEl = document.getElementById('weapon-cards');
   let cardHtml = '';
   for (const item of items) {
-    const iid        = item.instanceId ?? '';
-    const pvp        = modeFilter !== 'pve' ? item.evaluation.pvp : null;
-    const pve        = modeFilter !== 'pvp' ? item.evaluation.pve : null;
-    const tag        = getTag(iid);
-    const tagInfo    = tag ? TAGS[tag] : null;
-    const damageClass = DAMAGE_CLASS[item.damageRaw] ?? item.damage.toLowerCase();
-    const isVault    = item.location === 2;
-    const locLabel   = isVault
-      ? 'vault'
-      : (characters.find(c => c.characterId === item.characterId)?.className ?? null);
-    const locClass   = isVault ? 'loc-vault' : '';
-
-    cardHtml += '<div class="weapon-card" data-instanceid="' + esc(iid) + '">';
-    cardHtml += item.icon
-      ? '<img class="weapon-card-icon" src="' + esc(item.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-card-icon-placeholder\')">'
-      : '<div class="weapon-card-icon-placeholder">⬡</div>';
-    cardHtml += '<div class="weapon-card-body">';
-    cardHtml += '<div class="weapon-card-name">' + esc(item.name) + '</div>';
-    cardHtml += '<div class="weapon-card-meta">';
-    cardHtml += '<span class="badge ' + item.rarity.toLowerCase() + '">' + esc(item.rarity) + '</span>';
-    cardHtml += '<span class="damage-dot ' + damageClass + '">' + esc(item.damage) + '</span>';
-    if (item.light) cardHtml += '<span class="light-val" style="font-size:11px">⬡ ' + item.light + '</span>';
-    if (locLabel) cardHtml += '<span class="item-card-location ' + locClass + '">' + esc(locLabel) + '</span>';
-    cardHtml += '</div>';
-    cardHtml += '<div class="weapon-card-pills">';
-    if (pve) cardHtml += resultPill(pve.result) + ' ';
-    if (pvp) cardHtml += resultPill(pvp.result);
-    cardHtml += '</div>';
-    cardHtml += '</div>';
-    if (tagInfo) cardHtml += '<span class="weapon-card-tag ' + tagInfo.cls + '">' + tagInfo.label + '</span>';
-    cardHtml += '</div>';
+    const iid = item.instanceId ?? '';
+    const pvp = modeFilter !== 'pve' ? item.evaluation.pvp : null;
+    const pve = modeFilter !== 'pvp' ? item.evaluation.pve : null;
+    const tag = getTag(iid);
+    cardHtml += renderCard('weapon', item, { pvp, pve, tag });
   }
   cardsEl.innerHTML = cardHtml;
 

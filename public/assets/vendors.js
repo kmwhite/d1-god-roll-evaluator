@@ -121,30 +121,7 @@ function renderVendorTable(items) {
 
 function renderVendorWeaponCards(items) {
   if (!items.length) return '';
-  let html = '<div class="vendor-cards">';
-  for (const item of items) {
-    const iid         = item.instanceId ?? '';
-    const pvp         = item.evaluation?.pvp;
-    const pve         = item.evaluation?.pve;
-    const damageClass = DAMAGE_CLASS[item.damageRaw] ?? (item.damage ?? '').toLowerCase();
-    html += '<div class="weapon-card" data-instanceid="' + esc(iid) + '">';
-    html += item.icon
-      ? '<img class="weapon-card-icon" src="' + esc(item.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-card-icon-placeholder\')">'
-      : '<div class="weapon-card-icon-placeholder">⬡</div>';
-    html += '<div class="weapon-card-body">';
-    html += '<div class="weapon-card-name">' + esc(item.name) + '</div>';
-    html += '<div class="weapon-card-meta">';
-    html += '<span class="badge ' + (item.rarity ?? '').toLowerCase() + '">' + esc(item.rarity ?? '—') + '</span>';
-    html += '<span class="damage-dot ' + damageClass + '">' + esc(item.damage ?? '—') + '</span>';
-    html += '<span class="weapon-card-type">' + esc(item.type ?? '') + '</span>';
-    html += '</div>';
-    html += '<div class="weapon-card-pills">';
-    if (pve) html += resultPill(pve.result) + ' ';
-    if (pvp) html += resultPill(pvp.result);
-    html += '</div>';
-    html += '</div>';
-    html += '</div>';
-  }
-  html += '</div>';
-  return html;
+  return '<div class="vendor-cards">'
+    + items.map(item => renderCard('weapon', item, { pvp: item.evaluation?.pvp, pve: item.evaluation?.pve })).join('')
+    + '</div>';
 }

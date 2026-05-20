@@ -724,6 +724,7 @@ footer { padding: 24px 40px; border-top: 1px solid var(--border); font-family: '
     gap: 12px;
     padding: 10px 12px;
     border-bottom: 1px solid var(--border);
+    cursor: pointer;
     transition: background 0.1s;
 }
 .armor-card:first-child { border-top: 2px solid var(--border-bright); }
