@@ -64,6 +64,8 @@ function renderVendors(sections) {
       if (item) openModal(item);
     });
   });
+
+  updateLayout();
 }
 
 function renderVendorTable(items) {

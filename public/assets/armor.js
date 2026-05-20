@@ -126,6 +126,8 @@ function updateLayout() {
   if (weaponTable) weaponTable.style.display  = isMobile ? 'none'  : '';
   if (armorCards)  armorCards.style.display   = isMobile ? 'block' : 'none';
   if (armorTable)  armorTable.style.display   = isMobile ? 'none'  : '';
+  document.querySelectorAll('.vendor-table-wrap').forEach(el => { el.style.display = isMobile ? 'none'  : ''; });
+  document.querySelectorAll('.vendor-cards').forEach(     el => { el.style.display = isMobile ? 'block' : 'none'; });
 }
 
 function renderArmor() {

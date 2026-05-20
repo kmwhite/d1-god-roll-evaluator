@@ -624,8 +624,6 @@ footer { padding: 24px 40px; border-top: 1px solid var(--border); font-family: '
 
     /* Hide the desktop table entirely on mobile */
     .table-wrap { display: none; }
-    .vendor-table-wrap { display: none; }
-    .vendor-cards { display: block; }
     footer { padding: 16px; font-size: 9px; }
 
     /* Tab bar */
@@ -661,7 +659,6 @@ footer { padding: 24px 40px; border-top: 1px solid var(--border); font-family: '
 /* ── Weapon/armor cards (mobile table replacement) ── */
 /* Visibility is controlled by JS updateLayout() — display:none is the default */
 #weapon-cards, #armor-cards { display: none; padding: 0 12px 32px; }
-.vendor-cards { display: none; }
 
 .weapon-card {
     display: flex;
