@@ -109,21 +109,64 @@ const ARMOR_SLOT_NAMES = {
 const ARMOR_CLASS_NAMES = { 0: 'Titan', 1: 'Hunter', 2: 'Warlock' };
 const ARMOR_BUCKET_SET = new Set(Object.keys(ARMOR_SLOT_NAMES).map(Number));
 
-// Maximum sum-of-two-stats for each armor slot — used for quality % calculation.
+// Observed maximum sum-of-two-stats per armor slot (reference only — not used in quality calc).
 // Source: https://l0r3.dev/page/Destiny-1-Maximum-Possible-Armor-Stats
 const ARMOR_MAX = {
   'Helmet': 111, 'Gloves': 99, 'Chest': 147, 'Legs': 135,
   'Class Item': 60, 'Ghost': 60, 'Artifact': 131,
 };
 
-function calcArmorQuality(intellect, discipline, strength, slot) {
-  const max = ARMOR_MAX[slot];
-  if (!max) return null;
-  const top2 = [intellect, discipline, strength]
-    .filter(v => typeof v === 'number' && v > 0)
-    .sort((a, b) => b - a)
-    .slice(0, 2);
-  return Math.floor(((top2[0] ?? 0) + (top2[1] ?? 0)) / max * 100);
+// Per-stat maximum at 335 light (split point for quality calculation).
+// Helmet/Gauntlets: bungie reports 48/43, but 46/41 observed in practice.
+// Source: https://github.com/DestinyItemManager/DIM/blob/b58d4f1a/src/app/inventory/store/armor-quality.ts
+const ARMOR_SPLIT = {
+  'Helmet': 46, 'Gloves': 41, 'Chest': 61, 'Legs': 56,
+  'Class Item': 25, 'Ghost': 25, 'Artifact': 38,
+};
+
+// Scaling curve: maps a light level to its upgrade multiplier value.
+function fitValue(light) {
+  if (light > 300) return 0.2546 * light - 23.825;
+  if (light > 200) return 0.1801 * light - 1.4612;
+  return -1;
+}
+
+// Scale a base stat to its equivalent value on a 335-light item.
+function scaleStat(base, light) {
+  const clamped = Math.min(light, 335);
+  const ratio   = fitValue(335) / fitValue(clamped);
+  return {
+    min: Math.floor(base * ratio),
+    max: Math.floor((base + 1) * ratio),
+  };
+}
+
+// Quality as a percentage of the theoretical best roll for the slot at 335 light.
+// Mirrors the DIM getQualityRating algorithm.
+// light: item defense/light level (primaryStat.value); defaults to 335 if absent.
+function calcArmorQuality(intellect, discipline, strength, light, slot) {
+  const split = ARMOR_SPLIT[slot];
+  if (!split) return null;
+  const effectiveLight = light ?? 335;
+  if (effectiveLight < 280) return null;
+
+  const slotMax = split * 2;
+  let totalMin  = 0;
+  let pure      = 0;
+
+  for (const base of [intellect, discipline, strength]) {
+    if (!base) continue;
+    const scaled = scaleStat(base, effectiveLight);
+    pure      = scaled.min;
+    totalMin += scaled.min;
+  }
+
+  // When only one stat is non-zero, halve (item not yet spec'd into a second stat).
+  if (pure === totalMin) totalMin = Math.floor(totalMin / 2);
+
+  const quality = Math.round((totalMin / slotMax) * 100);
+  // Cap at 100 for non-Artifact slots; Artifacts can legitimately exceed 100.
+  return slot === 'Artifact' ? quality : Math.min(100, quality);
 }
 
 function armorRank(quality) {
@@ -137,28 +180,25 @@ function armorRank(quality) {
 }
 
 function extractStats(stub, { intellect: ih, discipline: dh, strength: sh }) {
-  const arr = Array.isArray(stub.stats) ? stub.stats : Object.values(stub.stats ?? {});
+  const arr  = Array.isArray(stub.stats) ? stub.stats : Object.values(stub.stats ?? {});
   const find = hash => arr.find(s => s.statHash === hash);
   return {
-    intellect:     find(ih)?.value        ?? 0,
-    discipline:    find(dh)?.value        ?? 0,
-    strength:      find(sh)?.value        ?? 0,
-    intellectMax:  find(ih)?.maximumValue ?? 60,
-    disciplineMax: find(dh)?.maximumValue ?? 60,
-    strengthMax:   find(sh)?.maximumValue ?? 60,
+    intellect:  find(ih)?.value ?? 0,
+    discipline: find(dh)?.value ?? 0,
+    strength:   find(sh)?.value ?? 0,
   };
 }
 
 function makeArmorRow(stub, itemData, location, characterId, armorStatHashes) {
   const slot = ARMOR_SLOT_NAMES[itemData.bucketTypeHash] ?? 'Unknown';
-  const { intellect, discipline, strength,
-          intellectMax, disciplineMax, strengthMax } = extractStats(stub, armorStatHashes);
-  const quality = calcArmorQuality(intellect, discipline, strength, slot);
+  const { intellect, discipline, strength } = extractStats(stub, armorStatHashes);
+  const light   = stub.primaryStat?.value ?? null;
+  const quality = calcArmorQuality(intellect, discipline, strength, light, slot);
   const rank    = armorRank(quality);
   const statsList = [
-    { name: 'Intellect',  value: intellect,  max: intellectMax  },
-    { name: 'Discipline', value: discipline, max: disciplineMax },
-    { name: 'Strength',   value: strength,   max: strengthMax   },
+    { name: 'Intellect',  value: intellect,  max: intellect  },
+    { name: 'Discipline', value: discipline, max: discipline },
+    { name: 'Strength',   value: strength,   max: strength   },
   ].filter(s => s.value > 0);
   return {
     itemType:    'armor',
@@ -600,9 +640,9 @@ async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap
           const itemData = armorDataMap.get(stub.itemHash);
           if (!itemData || !ARMOR_BUCKET_SET.has(itemData.bucketTypeHash ?? 0)) continue;
           const slot = ARMOR_SLOT_NAMES[itemData.bucketTypeHash] ?? 'Unknown';
-          const { intellect, discipline, strength,
-                  intellectMax, disciplineMax, strengthMax } = extractStats(stub, armorStatHashes);
-          const quality = calcArmorQuality(intellect, discipline, strength, slot);
+          const { intellect, discipline, strength } = extractStats(stub, armorStatHashes);
+          const light   = stub.primaryStat?.value ?? null;
+          const quality = calcArmorQuality(intellect, discipline, strength, light, slot);
           const rank    = armorRank(quality);
           rows.push({
             itemType:     'armor',
@@ -615,9 +655,9 @@ async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap
             intellect, discipline, strength,
             evaluation:   { rank, quality },
             stats: [
-              { name: 'Intellect',  value: intellect,  max: intellectMax  },
-              { name: 'Discipline', value: discipline, max: disciplineMax },
-              { name: 'Strength',   value: strength,   max: strengthMax   },
+              { name: 'Intellect',  value: intellect,  max: intellect  },
+              { name: 'Discipline', value: discipline, max: discipline },
+              { name: 'Strength',   value: strength,   max: strength   },
             ].filter(s => s.value > 0),
             perks: [],
           });
