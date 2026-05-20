@@ -40,9 +40,11 @@ function renderVendors(sections) {
       html += '<div class="vendor-empty">' + esc(msg) + '</div>';
     } else {
       html += renderVendorTable(weaponItems);
+      html += renderVendorWeaponCards(weaponItems);
     }
     if (armorItems.length > 0) {
       html += renderVendorArmorTable(armorItems);
+      html += renderVendorArmorCards(armorItems);
     }
     html += '</div>';
   }
@@ -55,10 +57,17 @@ function renderVendors(sections) {
       if (item) openModal(item);
     });
   });
+
+  container.querySelectorAll('.vendor-cards [data-instanceid]').forEach(card => {
+    card.addEventListener('click', () => {
+      const item = findItem(card.dataset.instanceid);
+      if (item) openModal(item);
+    });
+  });
 }
 
 function renderVendorTable(items) {
-  let html = '<div class="table-wrap" style="padding:0"><table style="width:100%;border-collapse:collapse;font-size:13px">';
+  let html = '<div class="vendor-table-wrap" style="padding:0"><table style="width:100%;border-collapse:collapse;font-size:13px">';
   html += '<thead><tr>';
   ['Icon','Weapon','Type','Rarity','Damage','Mode','Column 1','Column 2','Column 3','Column 4','Result'].forEach(h => {
     html += '<th class="no-sort" style="' + thStyle() + '">' + h + '</th>';
@@ -107,5 +116,35 @@ function renderVendorTable(items) {
   }
 
   html += '</tbody></table></div>';
+  return html;
+}
+
+function renderVendorWeaponCards(items) {
+  if (!items.length) return '';
+  let html = '<div class="vendor-cards">';
+  for (const item of items) {
+    const iid         = item.instanceId ?? '';
+    const pvp         = item.evaluation?.pvp;
+    const pve         = item.evaluation?.pve;
+    const damageClass = DAMAGE_CLASS[item.damageRaw] ?? (item.damage ?? '').toLowerCase();
+    html += '<div class="weapon-card" data-instanceid="' + esc(iid) + '">';
+    html += item.icon
+      ? '<img class="weapon-card-icon" src="' + esc(item.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-card-icon-placeholder\')">'
+      : '<div class="weapon-card-icon-placeholder">⬡</div>';
+    html += '<div class="weapon-card-body">';
+    html += '<div class="weapon-card-name">' + esc(item.name) + '</div>';
+    html += '<div class="weapon-card-meta">';
+    html += '<span class="badge ' + (item.rarity ?? '').toLowerCase() + '">' + esc(item.rarity ?? '—') + '</span>';
+    html += '<span class="damage-dot ' + damageClass + '">' + esc(item.damage ?? '—') + '</span>';
+    html += '<span class="weapon-card-type">' + esc(item.type ?? '') + '</span>';
+    html += '</div>';
+    html += '<div class="weapon-card-pills">';
+    if (pve) html += resultPill(pve.result) + ' ';
+    if (pvp) html += resultPill(pvp.result);
+    html += '</div>';
+    html += '</div>';
+    html += '</div>';
+  }
+  html += '</div>';
   return html;
 }

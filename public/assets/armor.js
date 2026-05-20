@@ -245,7 +245,7 @@ function renderArmor() {
 }
 
 function renderVendorArmorTable(rows) {
-  let html = '<div class="table-wrap" style="padding:0;margin-top:8px"><table style="width:100%;border-collapse:collapse;font-size:13px">';
+  let html = '<div class="vendor-table-wrap" style="padding:0;margin-top:8px"><table style="width:100%;border-collapse:collapse;font-size:13px">';
   html += '<thead><tr>';
   ['Icon', 'Armor', 'Type', 'Rarity', 'INT', 'DIS', 'STR', 'Quality', 'Rank'].forEach(h => {
     html += '<th class="no-sort" style="' + thStyle() + '">' + h + '</th>';
@@ -272,6 +272,40 @@ function renderVendorArmorTable(rows) {
     html += '</tr>';
   }
   html += '</tbody></table></div>';
+  return html;
+}
+
+function renderVendorArmorCards(rows) {
+  if (!rows.length) return '';
+  let html = '<div class="vendor-cards" style="margin-top:4px">';
+  for (const r of rows) {
+    const rank    = r.evaluation?.rank    ?? '—';
+    const quality = r.evaluation?.quality ?? null;
+    const rankKey = rank === '—' ? 'none' : rank.toLowerCase();
+    const icon = r.icon
+      ? '<img class="weapon-icon" src="' + esc(r.icon) + '" alt="" loading="lazy" onerror="iconError(this,\'weapon-icon-placeholder\')">'
+      : '<div class="weapon-icon-placeholder">⬡</div>';
+    html += '<div class="armor-card" style="cursor:pointer" data-instanceid="' + esc(r.instanceId ?? '') + '">';
+    html += icon;
+    html += '<div class="armor-card-body">';
+    html += '<div class="armor-card-header">';
+    html += '<span class="armor-card-name">' + esc(r.name) + '</span>';
+    html += '<span class="rank-badge rank-' + rankKey + '">' + esc(rank) + '</span>';
+    html += '</div>';
+    html += '<div class="armor-card-meta">';
+    html += '<span class="badge ' + (r.rarity ?? '').toLowerCase() + '">' + esc(r.rarity ?? '—') + '</span>';
+    html += '<span class="armor-card-subtype">' + esc(r.type) + '</span>';
+    html += '</div>';
+    html += '<div class="armor-card-stats">';
+    html += '<span class="armor-card-stat">INT <b>' + (r.intellect  || '—') + '</b></span>';
+    html += '<span class="armor-card-stat">DIS <b>' + (r.discipline || '—') + '</b></span>';
+    html += '<span class="armor-card-stat">STR <b>' + (r.strength   || '—') + '</b></span>';
+    if (quality !== null) html += '<span class="armor-card-quality">' + quality + '%</span>';
+    html += '</div>';
+    html += '</div>';
+    html += '</div>';
+  }
+  html += '</div>';
   return html;
 }
 
