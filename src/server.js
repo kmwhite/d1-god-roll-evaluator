@@ -518,9 +518,9 @@ const VENDORS = [
   { hash: 570929315,  name: 'Banshee-44',        location: 'Tower',  social: true  },
   { hash: 3746647075, name: 'Lord Shaxx',         location: 'Tower',  social: true  },
   { hash: 3658200622, name: 'Arcite 99-40',       location: 'Tower',  social: true  },
-  { hash: 1990950,    name: 'Commander Zavala',   location: 'Tower',  social: true  },
-  { hash: 3003633346, name: 'Cayde-6',            location: 'Tower',  social: true  },
-  { hash: 1575820975, name: 'Ikora Rey',          location: 'Tower',  social: true  },
+  { hash: 1990950,    name: 'Commander Zavala',   location: 'Tower',  social: true,  classType: 0 },
+  { hash: 3003633346, name: 'Cayde-6',            location: 'Tower',  social: true,  classType: 1 },
+  { hash: 1575820975, name: 'Ikora Rey',          location: 'Tower',  social: true,  classType: 2 },
   { hash: 174528503,  name: 'Eris Morn',          location: 'Tower',  social: true  },
   { hash: 2668878854, name: 'Roni 55-30',         location: 'Tower',  social: true  },
   { hash: 1998812735, name: 'Variks',             location: 'Reef',   social: true  },
@@ -539,13 +539,15 @@ async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap
   const mt = membershipTypeOverride ?? membershipType;
   const platformMembershipId = await getMembershipId(mt, API_KEY, bungieToken, bungieNetMembershipId);
 
-  // Use first character — vendor inventories are the same across characters for social vendors
   const characters = await getCharacters(mt, platformMembershipId, API_KEY, bungieToken);
   if (!characters.length) throw new Error('No characters found');
-  const charId = characters[0].characterId;
+  const defaultCharId = characters[0].characterId;
 
-  // Fetch all vendors in parallel
+  // Fetch all vendors in parallel; vanguard reps use their class-specific character
   const vendorResults = await Promise.all(VENDORS.map(async vendor => {
+    const charId = vendor.classType != null
+      ? (characters.find(c => c.classType === vendor.classType)?.characterId ?? defaultCharId)
+      : defaultCharId;
     try {
       const res = await fetch(
         `https://www.bungie.net/Platform/Destiny/${mt}/MyAccount/Character/${charId}/Vendor/${vendor.hash}/`,

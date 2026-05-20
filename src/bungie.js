@@ -281,6 +281,7 @@ export async function getCharacters(membershipType, membershipId, apiKey, access
     const base = c.characterBase;
     return {
       characterId:          base.characterId,
+      classType:            base.classType,
       className:            CLASS_NAMES[base.classType]   ?? `Class${base.classType}`,
       raceName:             RACE_HASHES[base.raceHash]    ?? `Unknown`,
       // emblemPath = small square icon; backgroundPath = wide rectangular banner
