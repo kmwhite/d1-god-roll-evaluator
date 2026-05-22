@@ -1,11 +1,36 @@
 /**
- * God roll definitions from two community sources.
- * Source labels: 'TRUEGaming', 'Reddit', 'TRUEGaming + Reddit'
- * Each entry is a single definition OR an array.
+ * God roll definitions from three community sources.
+ * Source labels: 'TRUEGaming', 'Reddit', 'TRUEGaming + Reddit', 'Last City Discord'
+ * Each entry is a single definition OR an array of definitions.
  * All four columns must be satisfied by ONE definition — no mixing.
+ *
+ * Last City Discord entries live in god-rolls-lcd.js and are merged in below.
  */
 
+import { LCD_PVE } from './god-rolls-lcd.js';
+
 export const CLOSE_THRESHOLD = 3;
+
+/**
+ * Merge LCD additions into the base PVE table.
+ * - New weapon names are added as-is.
+ * - Existing single-object entries are promoted to arrays with the LCD
+ *   definition appended.
+ * - Existing array entries receive the LCD definition appended.
+ */
+function mergeLCD(base, additions) {
+  const out = { ...base };
+  for (const [name, def] of Object.entries(additions)) {
+    if (out[name] === undefined) {
+      out[name] = def;
+    } else {
+      const existing = Array.isArray(out[name]) ? out[name] : [out[name]];
+      const add      = Array.isArray(def)        ? def        : [def];
+      out[name] = [...existing, ...add];
+    }
+  }
+  return out;
+}
 
 export const PVP = {
   // Scout Rifles
@@ -272,7 +297,7 @@ export const PVP = {
   "The Warpath":           { source: 'TRUEGaming + Reddit', col1: ["Warhead Verniers", "Hard Launch"], col2: ["Field Scout"], col3: ["Javelin"], col4: ["Grenades and Horseshoes"] },
 };
 
-export const PVE = {
+const PVE_BASE = {
   // Scout Rifles
   "Angel's Advocate": [
     { source: 'TRUEGaming', col1: ["Reflex"], col2: ["Outlaw"], col3: ["High Caliber Rounds"], col4: ["Firefly"] },
@@ -488,3 +513,5 @@ export const PVE = {
   "The Vertigo":           { source: 'TRUEGaming + Reddit', col1: ["Warhead Verniers", "Hard Launch"], col2: ["Heavy Payload"], col3: ["Grenades and Horseshoes", "Tracking"], col4: ["Javelin"] },
   "The Warpath":           { source: 'TRUEGaming + Reddit', col1: ["Warhead Verniers", "Hard Launch"], col2: ["Field Scout"], col3: ["Javelin"], col4: ["Grenades and Horseshoes", "Tracking"] },
 };
+
+export const PVE = mergeLCD(PVE_BASE, LCD_PVE);
