@@ -189,15 +189,6 @@ header p {
 }
 .filter-btn:hover { border-color: var(--border-bright); color: var(--text); }
 .filter-btn.active { background: var(--amber-glow); border-color: var(--amber); color: var(--amber-bright); }
-.tag-filter-btn {
-    padding: 3px 10px; background: var(--surface2);
-    border: 1px solid var(--border); color: var(--text-dim);
-    font-family: 'Rajdhani', sans-serif; font-size: 13px;
-    font-weight: 600; letter-spacing: 0.06em;
-    text-transform: uppercase; cursor: pointer; transition: all 0.15s;
-}
-.tag-filter-btn:hover { border-color: var(--border-bright); color: var(--text); }
-.tag-filter-btn.active { background: rgba(120,80,200,0.12); border-color: #7b5ea7; color: #a888d0; }
 .mode-filter-btn {
     padding: 3px 10px; background: var(--surface2);
     border: 1px solid var(--border); color: var(--text-dim);
@@ -209,6 +200,19 @@ header p {
 .mode-filter-btn.active               { background: rgba(60,120,200,0.1); border-color: #4a7c9e; color: #7ab0d0; }
 .mode-filter-btn.active[data-mode="pvp"] { background: rgba(200,80,80,0.08); border-color: rgba(200,80,80,0.5); color: #e06060; }
 .mode-filter-btn.active[data-mode="pve"] { background: rgba(60,120,200,0.08); border-color: rgba(60,120,200,0.5); color: #60a0e0; }
+
+/* Shared filter buttons (Location, Tag, Rarity — apply across tabs) */
+.shared-filter-btn {
+    padding: 3px 10px; background: var(--surface2);
+    border: 1px solid var(--border); color: var(--text-dim);
+    font-family: 'Rajdhani', sans-serif; font-size: 13px;
+    font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; cursor: pointer; transition: all 0.15s;
+}
+.shared-filter-btn:hover  { border-color: var(--border-bright); color: var(--text); }
+.shared-filter-btn.active { background: var(--amber-glow); border-color: var(--amber); color: var(--amber-bright); }
+/* Tag filter uses purple active state to distinguish it from location/rarity */
+.shared-filter-btn[data-shared="tag"].active { background: rgba(120,80,200,0.12); border-color: #7b5ea7; color: #a888d0; }
 
 /* Armor filter buttons — same base style as filter-btn */
 .armor-filter-btn {
@@ -615,8 +619,10 @@ footer { padding: 24px 40px; border-top: 1px solid var(--border); font-family: '
         flex-shrink: 0;
         padding: 4px 8px;
     }
-    /* Hide verbose weapon filter groups on mobile — keep Result, Mode, Tag */
+    /* Hide verbose weapon filter groups on mobile — keep Result, Mode, Slot */
     #controls-row .filter-group:nth-child(n+4) { display: none; }
+    /* Hide Rarity from shared bar on mobile — keep Location and Tag */
+    #shared-controls-row .filter-group:nth-child(n+3) { display: none; }
     .filter-label { display: none; }
 
     /* Stats bar */

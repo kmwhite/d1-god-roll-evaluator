@@ -15,16 +15,17 @@ let rarityFilter = 'all'; // Common, Uncommon, Rare, Legendary, Exotic
 let damageFilter = 'all'; // Kinetic, Arc, Solar, Void
 let searchTerm = '';
 
+// ── Shared filters (apply to both weapons and armor) ─────────────────────────
+let locationFilter = 'all'; // 'all' | 'vault' | characterId string
+
 // ── Armor state ───────────────────────────────────────────────────────────────
-let ARMOR_RAW           = [];
-let armorLoaded         = false;
-let armorClassFilter    = 'all';
-let armorTypeFilter     = 'all';
-let armorRankFilter     = 'all';
-let armorLocationFilter = 'all';
-let armorTagFilter      = 'all';
-let armorSortCol        = 'rank';
-let armorSortDir        = 1;
+let ARMOR_RAW        = [];
+let armorLoaded      = false;
+let armorClassFilter = 'all';
+let armorTypeFilter  = 'all';
+let armorRankFilter  = 'all';
+let armorSortCol     = 'rank';
+let armorSortDir     = 1;
 
 // ── Vendor state ──────────────────────────────────────────────────────────────
 let vendorItems_   = []; // flat array of all vendor items for findItem() lookup

@@ -22,31 +22,30 @@ document.querySelectorAll('.armor-filter-btn').forEach(btn => {
     document.querySelectorAll(`.armor-filter-btn[data-armor="${group}"]`).forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const val = btn.dataset.val;
-    if (group === 'class')    armorClassFilter    = val;
-    if (group === 'type')     armorTypeFilter     = val;
-    if (group === 'rank')     armorRankFilter     = val;
-    if (group === 'location') armorLocationFilter = val;
-    if (group === 'tag')      armorTagFilter      = val;
+    if (group === 'class') armorClassFilter = val;
+    if (group === 'type')  armorTypeFilter  = val;
+    if (group === 'rank')  armorRankFilter  = val;
     if (armorLoaded) renderArmor();
   });
 });
 
-function initArmorLocationFilters() {
-  const group = document.getElementById('armor-location-filter-group');
+function initLocationFilters() {
+  const group = document.getElementById('shared-location-filter-group');
   if (!group) return;
-  group.querySelectorAll('.armor-filter-btn[data-generated]').forEach(b => b.remove());
+  group.querySelectorAll('.shared-filter-btn[data-generated]').forEach(b => b.remove());
   for (const char of characters) {
     const btn = document.createElement('button');
-    btn.className = 'armor-filter-btn';
-    btn.dataset.armor = 'location';
+    btn.className = 'shared-filter-btn';
+    btn.dataset.shared = 'location';
     btn.dataset.val = char.characterId;
     btn.dataset.generated = '1';
     btn.textContent = char.className;
     group.appendChild(btn);
     btn.addEventListener('click', () => {
-      group.querySelectorAll('.armor-filter-btn[data-armor="location"]').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.shared-filter-btn[data-shared="location"]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      armorLocationFilter = char.characterId;
+      locationFilter = char.characterId;
+      render();
       if (armorLoaded) renderArmor();
     });
   }
@@ -64,7 +63,7 @@ async function loadArmor() {
     if (!raw.ok) throw new Error(raw.error ?? 'Unknown error');
     ARMOR_RAW = JSON.parse(JSON.stringify(raw.items));
     armorLoaded = true;
-    initArmorLocationFilters();
+    initLocationFilters();
     renderArmor();
   } catch (err) {
     const errHtml = tabLoadingHtml('Failed to load armor: ' + err.message);
@@ -76,14 +75,14 @@ async function loadArmor() {
 function getArmorRows() {
   let rows = [...ARMOR_RAW];
   // Universal items (className === null: Ghost, Artifact) appear under every class filter
-  if (armorClassFilter    !== 'all') rows = rows.filter(r => r.className === armorClassFilter || r.className === null);
-  if (armorTypeFilter     !== 'all') rows = rows.filter(r => r.type === armorTypeFilter);
-  if (armorRankFilter     !== 'all') rows = rows.filter(r => r.evaluation?.rank === armorRankFilter);
-  if (armorLocationFilter === 'vault') {
+  if (armorClassFilter !== 'all') rows = rows.filter(r => r.className === armorClassFilter || r.className === null);
+  if (armorTypeFilter  !== 'all') rows = rows.filter(r => r.type === armorTypeFilter);
+  if (armorRankFilter  !== 'all') rows = rows.filter(r => r.evaluation?.rank === armorRankFilter);
+  if (rarityFilter     !== 'all') rows = rows.filter(r => r.rarity === rarityFilter);
+  if (locationFilter === 'vault') {
     rows = rows.filter(r => r.location === 'vault');
-  } else if (armorLocationFilter !== 'all') {
-    // armorLocationFilter is a characterId string
-    rows = rows.filter(r => r.characterId === armorLocationFilter);
+  } else if (locationFilter !== 'all') {
+    rows = rows.filter(r => r.characterId === locationFilter);
   }
 
   if (searchTerm) {
@@ -95,10 +94,10 @@ function getArmorRows() {
     );
   }
 
-  if (armorTagFilter !== 'all') {
+  if (tagFilter !== 'all') {
     const tags = loadTags();
-    if (armorTagFilter === 'none') rows = rows.filter(r => !tags[r.instanceId]);
-    else                           rows = rows.filter(r => tags[r.instanceId] === armorTagFilter);
+    if (tagFilter === 'none') rows = rows.filter(r => !tags[r.instanceId]);
+    else                      rows = rows.filter(r => tags[r.instanceId] === tagFilter);
   }
 
   rows.sort((a, b) => {

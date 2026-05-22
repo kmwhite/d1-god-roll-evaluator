@@ -101,6 +101,7 @@ async function loadInventory() {
     characterIds = data.characterIds ?? [];
     platformMembershipId = data.platformMembershipId ?? null;
     document.querySelector('th[data-col="result"]').classList.add('sort-asc');
+    initLocationFilters();
     render();
   } catch (err) {
     document.getElementById('error-msg').textContent = 'Failed to load inventory: ' + err.message;
@@ -115,6 +116,7 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
   vendorItems_ = [];
   vendorsLoaded = false;
   slotFilter = typeFilter = rarityFilter = damageFilter = 'all';
+  tagFilter = locationFilter = 'all';
   loadInventory();
 });
 
@@ -128,9 +130,22 @@ document.querySelectorAll('.dyn-filter-btn').forEach(btn => {
     const val = btn.dataset.val;
     if (group === 'slot')   slotFilter   = val;
     if (group === 'type')   typeFilter   = val;
-    if (group === 'rarity') rarityFilter = val;
     if (group === 'damage') damageFilter = val;
     render();
+  });
+});
+
+document.querySelectorAll('.shared-filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const group = btn.dataset.shared;
+    document.querySelectorAll(`.shared-filter-btn[data-shared="${group}"]`).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const val = btn.dataset.val;
+    if (group === 'location') locationFilter = val;
+    if (group === 'tag')      tagFilter      = val;
+    if (group === 'rarity')   rarityFilter   = val;
+    render();
+    if (armorLoaded) renderArmor();
   });
 });
 
@@ -156,6 +171,11 @@ function getRows() {
   if (typeFilter   !== 'all') rows = rows.filter(r => r.type   === typeFilter);
   if (rarityFilter !== 'all') rows = rows.filter(r => r.rarity === rarityFilter);
   if (damageFilter !== 'all') rows = rows.filter(r => r.damage === damageFilter);
+  if (locationFilter === 'vault') {
+    rows = rows.filter(r => r.location === 2); // weapons use numeric location
+  } else if (locationFilter !== 'all') {
+    rows = rows.filter(r => r.characterId === locationFilter);
+  }
 
   if (tagFilter !== 'all') {
     const tags = loadTags();
@@ -285,15 +305,6 @@ document.querySelectorAll('.mode-filter-btn').forEach(btn => {
     document.querySelectorAll('.mode-filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     modeFilter = btn.dataset.mode;
-    render();
-  });
-});
-
-document.querySelectorAll('.tag-filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tag-filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    tagFilter = btn.dataset.tag;
     render();
   });
 });

@@ -68,6 +68,39 @@
         </button>
       </div>
 
+      <!-- Shared filters (Location, Tag, Rarity — apply to weapons and armor) -->
+      <div class="controls shared-controls">
+        <div class="controls-row" id="shared-controls-row">
+          <div class="filter-group" id="shared-location-filter-group">
+            <span class="filter-label">Location:</span>
+            <button class="shared-filter-btn active" data-shared="location" data-val="all">All</button>
+            <button class="shared-filter-btn" data-shared="location" data-val="vault">Vault</button>
+            <!-- Per-character buttons injected by initLocationFilters() -->
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Tag:</span>
+            <button class="shared-filter-btn active" data-shared="tag" data-val="all">All</button>
+            <button class="shared-filter-btn" data-shared="tag" data-val="none"><i class="fa-duotone fa-solid fa-ban"></i> Untagged</button>
+            <button class="shared-filter-btn" data-shared="tag" data-val="favorite"><i class="fa-duotone fa-solid fa-shield-heart"></i> Favorite</button>
+            <button class="shared-filter-btn" data-shared="tag" data-val="keep"><i class="fa-duotone fa-solid fa-bookmark"></i> Keep</button>
+            <button class="shared-filter-btn" data-shared="tag" data-val="upgrade"><i class="fa-duotone fa-solid fa-arrow-up-right-dots"></i> Upgrade</button>
+            <button class="shared-filter-btn" data-shared="tag" data-val="evaluate"><i class="fa-duotone fa-solid fa-magnifying-glass"></i> Evaluate</button>
+            <button class="shared-filter-btn" data-shared="tag" data-val="infuse"><i class="fa-duotone fa-solid fa-charging-station"></i> Infuse</button>
+            <button class="shared-filter-btn" data-shared="tag" data-val="junk"><i class="fa-duotone fa-solid fa-trash-can"></i> Junk</button>
+            <button class="shared-filter-btn" data-shared="tag" data-val="archive"><i class="fa-duotone fa-solid fa-box-archive"></i> Archive</button>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Rarity:</span>
+            <button class="shared-filter-btn active" data-shared="rarity" data-val="all">All</button>
+            <button class="shared-filter-btn" data-shared="rarity" data-val="Exotic">Exotic</button>
+            <button class="shared-filter-btn" data-shared="rarity" data-val="Legendary">Legendary</button>
+            <button class="shared-filter-btn" data-shared="rarity" data-val="Rare">Rare</button>
+            <button class="shared-filter-btn" data-shared="rarity" data-val="Uncommon">Uncommon</button>
+            <button class="shared-filter-btn" data-shared="rarity" data-val="Common">Common</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Weapons tab -->
       <div class="tab-panel" id="tab-weapons">
         <div class="controls">
@@ -87,18 +120,6 @@
               <button class="mode-filter-btn active" data-mode="all">Both</button>
               <button class="mode-filter-btn" data-mode="pve">PvE</button>
               <button class="mode-filter-btn" data-mode="pvp">PvP</button>
-            </div>
-            <div class="filter-group">
-              <span class="filter-label">Tag:</span>
-              <button class="tag-filter-btn active" data-tag="all">All</button>
-              <button class="tag-filter-btn" data-tag="none"><i class="fa-duotone fa-solid fa-ban"></i> Untagged</button>
-              <button class="tag-filter-btn" data-tag="favorite"><i class="fa-duotone fa-solid fa-shield-heart"></i> Favorite</button>
-              <button class="tag-filter-btn" data-tag="keep"><i class="fa-duotone fa-solid fa-bookmark"></i> Keep</button>
-              <button class="tag-filter-btn" data-tag="upgrade"><i class="fa-duotone fa-solid fa-arrow-up-right-dots"></i> Upgrade</button>
-              <button class="tag-filter-btn" data-tag="evaluate"><i class="fa-duotone fa-solid fa-magnifying-glass"></i> Evaluate</button>
-              <button class="tag-filter-btn" data-tag="infuse"><i class="fa-duotone fa-solid fa-charging-station"></i> Infuse</button>
-              <button class="tag-filter-btn" data-tag="junk"><i class="fa-duotone fa-solid fa-trash-can"></i> Junk</button>
-              <button class="tag-filter-btn" data-tag="archive"><i class="fa-duotone fa-solid fa-box-archive"></i> Archive</button>
             </div>
             <div class="filter-group">
               <span class="filter-label">Slot:</span>
@@ -121,15 +142,6 @@
               <button class="dyn-filter-btn" data-dyn="type" data-val="Machine Gun">Machine Gun</button>
               <button class="dyn-filter-btn" data-dyn="type" data-val="Rocket Launcher">Rocket Launcher</button>
               <button class="dyn-filter-btn" data-dyn="type" data-val="Sword">Sword</button>
-            </div>
-            <div class="filter-group">
-              <span class="filter-label">Rarity:</span>
-              <button class="dyn-filter-btn active" data-dyn="rarity" data-val="all">All</button>
-              <button class="dyn-filter-btn" data-dyn="rarity" data-val="Exotic" data-rarity="Exotic">Exotic</button>
-              <button class="dyn-filter-btn" data-dyn="rarity" data-val="Legendary" data-rarity="Legendary">Legendary</button>
-              <button class="dyn-filter-btn" data-dyn="rarity" data-val="Rare" data-rarity="Rare">Rare</button>
-              <button class="dyn-filter-btn" data-dyn="rarity" data-val="Uncommon" data-rarity="Uncommon">Uncommon</button>
-              <button class="dyn-filter-btn" data-dyn="rarity" data-val="Common" data-rarity="Common">Common</button>
             </div>
             <div class="filter-group">
               <span class="filter-label">Damage:</span>
@@ -197,24 +209,6 @@
               <button class="armor-filter-btn" data-armor="type" data-val="Class Item">Class Item</button>
               <button class="armor-filter-btn" data-armor="type" data-val="Ghost">Ghost</button>
               <button class="armor-filter-btn" data-armor="type" data-val="Artifact">Artifact</button>
-            </div>
-            <div class="filter-group" id="armor-location-filter-group">
-              <span class="filter-label">Location:</span>
-              <button class="armor-filter-btn active" data-armor="location" data-val="all">All</button>
-              <button class="armor-filter-btn" data-armor="location" data-val="vault">Vault</button>
-              <!-- Per-character buttons injected by initArmorLocationFilters() -->
-            </div>
-            <div class="filter-group">
-              <span class="filter-label">Tag:</span>
-              <button class="armor-filter-btn active" data-armor="tag" data-val="all">All</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="none"><i class="fa-duotone fa-solid fa-ban"></i> Untagged</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="favorite"><i class="fa-duotone fa-solid fa-shield-heart"></i> Favorite</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="keep"><i class="fa-duotone fa-solid fa-bookmark"></i> Keep</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="upgrade"><i class="fa-duotone fa-solid fa-arrow-up-right-dots"></i> Upgrade</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="evaluate"><i class="fa-duotone fa-solid fa-magnifying-glass"></i> Evaluate</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="infuse"><i class="fa-duotone fa-solid fa-charging-station"></i> Infuse</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="junk"><i class="fa-duotone fa-solid fa-trash-can"></i> Junk</button>
-              <button class="armor-filter-btn" data-armor="tag" data-val="archive"><i class="fa-duotone fa-solid fa-box-archive"></i> Archive</button>
             </div>
             <div class="filter-group">
               <span class="filter-label">Rank:</span>
