@@ -54,7 +54,7 @@ function initLocationFilters() {
 async function loadArmor() {
   const loadingHtml = tabLoadingHtml('Loading armor…');
   document.getElementById('armor-tbody').innerHTML =
-    '<tr><td colspan="11">' + loadingHtml + '</td></tr>';
+    '<tr><td colspan="13">' + loadingHtml + '</td></tr>';
   document.getElementById('armor-cards').innerHTML = loadingHtml;
   updateLayout();
   try {
@@ -67,7 +67,7 @@ async function loadArmor() {
     renderArmor();
   } catch (err) {
     const errHtml = tabLoadingHtml('Failed to load armor: ' + err.message);
-    document.getElementById('armor-tbody').innerHTML = '<tr><td colspan="11">' + errHtml + '</td></tr>';
+    document.getElementById('armor-tbody').innerHTML = '<tr><td colspan="13">' + errHtml + '</td></tr>';
     document.getElementById('armor-cards').innerHTML = errHtml;
   }
 }
@@ -93,6 +93,9 @@ function getArmorRows() {
       (r.className ?? '').toLowerCase().includes(q)
     );
   }
+
+  if (lockFilter === 'locked')   rows = rows.filter(r =>  r.locked);
+  if (lockFilter === 'unlocked') rows = rows.filter(r => !r.locked);
 
   if (tagFilter !== 'all') {
     const tags = loadTags();
@@ -138,7 +141,7 @@ function renderArmor() {
   document.getElementById('armor-stat-a').textContent = rows.filter(r => r.evaluation?.rank === 'A').length;
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--text-dim)">No armor found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:32px;color:var(--text-dim)">No armor found.</td></tr>';
     document.getElementById('armor-cards').innerHTML = '';
     updateLayout();
     return;
@@ -167,6 +170,11 @@ function renderArmor() {
     tableHtml += '<td class="armor-stat-cell">' + (quality !== null ? quality + '%' : '—') + '</td>';
     tableHtml += '<td><span class="rank-badge rank-' + rankKey + '">' + esc(rank) + '</span></td>';
     tableHtml += renderTagCell(r.instanceId);
+    tableHtml += '<td class="lock-cell">'
+      + '<button class="lock-btn' + (r.locked ? '' : ' lock-open') + '" data-iid="' + esc(r.instanceId ?? '') + '" '
+      + 'onclick="event.stopPropagation();handleLock(\'' + esc(r.instanceId ?? '') + '\',this)">'
+      + (r.locked ? '<i class="fa-duotone fa-solid fa-lock"></i>' : '<i class="fa-duotone fa-solid fa-lock-open"></i>')
+      + '</button></td>';
     tableHtml += '</tr>';
   }
   tbody.innerHTML = tableHtml;

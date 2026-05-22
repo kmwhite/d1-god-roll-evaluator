@@ -88,7 +88,7 @@ async function loadInventory() {
   document.getElementById('stat-god').textContent   = '—';
   document.getElementById('stat-close').textContent = '—';
   document.getElementById('tbody').innerHTML =
-    '<tr><td colspan="13">' + loadingHtml + '</td></tr>';
+    '<tr><td colspan="14">' + loadingHtml + '</td></tr>';
   document.getElementById('weapon-cards').innerHTML = loadingHtml;
   updateLayout();
   try {
@@ -116,7 +116,7 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
   vendorItems_ = [];
   vendorsLoaded = false;
   slotFilter = typeFilter = rarityFilter = damageFilter = 'all';
-  tagFilter = locationFilter = 'all';
+  tagFilter = locationFilter = lockFilter = 'all';
   loadInventory();
 });
 
@@ -144,6 +144,7 @@ document.querySelectorAll('.shared-filter-btn').forEach(btn => {
     if (group === 'location') locationFilter = val;
     if (group === 'tag')      tagFilter      = val;
     if (group === 'rarity')   rarityFilter   = val;
+    if (group === 'lock')     lockFilter     = val;
     render();
     if (armorLoaded) renderArmor();
   });
@@ -176,6 +177,8 @@ function getRows() {
   } else if (locationFilter !== 'all') {
     rows = rows.filter(r => r.characterId === locationFilter);
   }
+  if (lockFilter === 'locked')   rows = rows.filter(r =>  r.locked);
+  if (lockFilter === 'unlocked') rows = rows.filter(r => !r.locked);
 
   if (tagFilter !== 'all') {
     const tags = loadTags();
@@ -239,6 +242,11 @@ function render() {
     html += '<td class="perk-cell">' + perkCell(firstEval.col4, perkCols[3]) + '</td>';
     html += '<td>' + resultPill(firstEval.result) + '</td>';
     html += renderTagCell(iid, rowspan);
+    html += '<td class="lock-cell"' + (rowspan ? ' ' + rowspan : '') + '>'
+      + '<button class="lock-btn' + (item.locked ? '' : ' lock-open') + '" data-iid="' + esc(iid) + '" '
+      + 'onclick="event.stopPropagation();handleLock(\'' + esc(iid) + '\',this)">'
+      + (item.locked ? '<i class="fa-duotone fa-solid fa-lock"></i>' : '<i class="fa-duotone fa-solid fa-lock-open"></i>')
+      + '</button></td>';
     html += '</tr>';
 
     if (bothModes) {

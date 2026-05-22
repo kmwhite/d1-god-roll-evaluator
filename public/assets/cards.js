@@ -50,6 +50,10 @@ function _weaponCard(item, opts) {
   html += '</div>';
   html += '</div>';
   if (tagInfo) html += '<span class="weapon-card-tag ' + tagInfo.cls + '">' + tagInfo.label + '</span>';
+  html += '<button class="lock-btn' + (item.locked ? '' : ' lock-open') + ' weapon-card-lock" data-iid="' + esc(iid) + '" '
+    + 'onclick="event.stopPropagation();handleLock(\'' + esc(iid) + '\',this)">'
+    + (item.locked ? '<i class="fa-duotone fa-solid fa-lock"></i>' : '<i class="fa-duotone fa-solid fa-lock-open"></i>')
+    + '</button>';
   html += '</div>';
   return html;
 }
@@ -106,6 +110,10 @@ function _armorCard(item, opts) {
     html += '<button class="tag-option clear" onclick="setTag(event,\'' + esc(item.instanceId) + '\',null)"><i class="fa-duotone fa-solid fa-xmark"></i> Clear</button>';
     html += '</div></div>';
   }
+  html += '<button class="lock-btn' + (item.locked ? '' : ' lock-open') + ' armor-card-lock" data-iid="' + esc(item.instanceId ?? '') + '" '
+    + 'onclick="event.stopPropagation();handleLock(\'' + esc(item.instanceId ?? '') + '\',this)">'
+    + (item.locked ? '<i class="fa-duotone fa-solid fa-lock"></i>' : '<i class="fa-duotone fa-solid fa-lock-open"></i>')
+    + '</button>';
   html += '</div></div>';
   return html;
 }

@@ -187,3 +187,37 @@ function renderTransferButtons(instanceId) {
   html += '</div>';
   container.innerHTML = html;
 }
+
+async function handleLock(instanceId, btnEl) {
+  const item = findItem(instanceId);
+  if (!item) return;
+
+  const newLocked = !item.locked;
+  // Vault items have no characterId; fall back to first available character
+  const charId = item.characterId ?? characterIds[0];
+  if (!charId) { alert('No character available to set lock state'); return; }
+
+  btnEl.disabled = true;
+
+  const res = await fetch('/api/lock', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ itemId: instanceId, characterId: charId, locked: newLocked }),
+  });
+  const result = await res.json();
+
+  btnEl.disabled = false;
+
+  if (result.ok) {
+    item.locked = newLocked;
+    // Update every lock button for this item (table row + card are mutually exclusive,
+    // but update all matching buttons in case the modal is also open)
+    const icon   = newLocked ? 'fa-lock' : 'fa-lock-open';
+    document.querySelectorAll('.lock-btn[data-iid="' + instanceId + '"]').forEach(b => {
+      b.classList.toggle('lock-open', !newLocked);
+      b.querySelector('i').className = 'fa-duotone fa-solid ' + icon;
+    });
+  } else {
+    alert('Lock failed: ' + result.error);
+  }
+}

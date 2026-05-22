@@ -17,6 +17,7 @@ let searchTerm = '';
 
 // ── Shared filters (apply to both weapons and armor) ─────────────────────────
 let locationFilter = 'all'; // 'all' | 'vault' | characterId string
+let lockFilter     = 'all'; // 'all' | 'locked' | 'unlocked'
 
 // ── Armor state ───────────────────────────────────────────────────────────────
 let ARMOR_RAW        = [];

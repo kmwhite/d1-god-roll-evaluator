@@ -372,6 +372,22 @@ td.perk-cell { max-width: 260px; }
 
 /* ── Tags ── */
 .tag-cell { position: relative; white-space: nowrap; }
+
+/* ── Lock button ── */
+.lock-cell { text-align: center; width: 32px; padding: 0 6px; }
+.lock-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 14px; padding: 4px; line-height: 1;
+    color: var(--amber-bright); opacity: 0.85; transition: opacity 0.15s;
+}
+.lock-btn:hover { opacity: 1; }
+.lock-btn.lock-open { color: var(--text-dim); opacity: 0.4; }
+.lock-btn.lock-open:hover { opacity: 0.8; }
+.lock-btn:disabled { opacity: 0.3; cursor: wait; }
+/* Position in weapon cards */
+.weapon-card-lock { align-self: center; flex-shrink: 0; }
+/* Position in armor cards */
+.armor-card-lock  { align-self: flex-start; margin-top: 2px; flex-shrink: 0; }
 .tag-pill {
     display: inline-block; padding: 2px 8px;
     font-size: 10px; font-family: 'Share Tech Mono', monospace;

@@ -204,6 +204,7 @@ function makeArmorRow(stub, itemData, location, characterId, armorStatHashes) {
     itemType:    'armor',
     instanceId:  stub.itemInstanceId,
     characterId: characterId ?? null,
+    locked:      stub.locked ?? false,
     className:   ARMOR_CLASS_NAMES[itemData.classType] ?? null,
     icon:        itemData.icon ? `https://www.bungie.net${itemData.icon}` : null,
     name:        itemData.name,
@@ -427,6 +428,7 @@ async function runEvaluation(bungieToken, bungieNetMembershipId, membershipTypeO
       itemHash:       stub.itemHash,
       characterId:    stub.characterId ?? null,
       transferStatus: stub.transferStatus ?? 0,
+      locked:         stub.locked ?? false,
       location:       stub.location ?? 1,
       slot,
       name, itemTypeName, tierType, damageType, icon, isCurated, light,
@@ -454,6 +456,7 @@ async function runEvaluation(bungieToken, bungieNetMembershipId, membershipTypeO
       itemHash:       r.itemHash,
       characterId:    r.characterId,
       transferStatus: r.transferStatus,
+      locked:         r.locked,
       location:       r.location,
       name:           r.name,
       type:           r.itemTypeName,
@@ -1023,6 +1026,50 @@ app.post('/api/equip', requireAuth, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error('[api/equip] Error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/lock
+ * Body: { itemId, characterId, locked }
+ *
+ * Sets the Bungie lock state on an item. characterId must be a valid
+ * character from the account; vault items should use any character ID.
+ */
+app.post('/api/lock', requireAuth, async (req, res) => {
+  const { itemId, characterId, locked } = req.body ?? {};
+  if (!itemId || !characterId || locked === undefined) {
+    return res.status(400).json({ ok: false, error: 'Missing required fields: itemId, characterId, locked' });
+  }
+
+  try {
+    const body = {
+      membershipType: req.membershipType,
+      itemId:         itemId,
+      characterId:    characterId,
+      state:          locked,
+    };
+
+    const bungieRes = await fetch('https://www.bungie.net/Platform/Destiny/SetLockState/', {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'X-API-Key':     API_KEY,
+        'Authorization': `Bearer ${req.token.access_token}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await bungieRes.json();
+    if (data.ErrorCode !== 1) {
+      console.error('[api/lock] Bungie error:', data.Message);
+      return res.status(400).json({ ok: false, error: data.Message ?? `ErrorCode ${data.ErrorCode}` });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[api/lock] Error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });

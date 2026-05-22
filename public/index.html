@@ -98,6 +98,12 @@
             <button class="shared-filter-btn" data-shared="rarity" data-val="Uncommon">Uncommon</button>
             <button class="shared-filter-btn" data-shared="rarity" data-val="Common">Common</button>
           </div>
+          <div class="filter-group">
+            <span class="filter-label">Lock:</span>
+            <button class="shared-filter-btn active" data-shared="lock" data-val="all">All</button>
+            <button class="shared-filter-btn" data-shared="lock" data-val="locked"><i class="fa-duotone fa-solid fa-lock"></i> Locked</button>
+            <button class="shared-filter-btn" data-shared="lock" data-val="unlocked"><i class="fa-duotone fa-solid fa-lock-open"></i> Unlocked</button>
+          </div>
         </div>
       </div>
 
@@ -177,6 +183,7 @@
                 <th data-col="col4">Column 4</th>
                 <th data-col="result">Result</th>
                 <th data-col="tag">Tag</th>
+                <th class="no-sort"><i class="fa-duotone fa-solid fa-lock"></i></th>
               </tr>
             </thead>
             <tbody id="tbody"></tbody>
@@ -243,6 +250,7 @@
                 <th data-acol="quality">Quality</th>
                 <th data-acol="rank">Rank</th>
                 <th data-col="tag">Tag</th>
+                <th class="no-sort"><i class="fa-duotone fa-solid fa-lock"></i></th>
               </tr>
             </thead>
             <tbody id="armor-tbody"></tbody>
