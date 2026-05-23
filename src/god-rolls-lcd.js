@@ -240,7 +240,7 @@ export const LCD_PVE = {
   'Uzume RR4':              SNP,
   "Weyloran's March":       n(SNP, 'Iron Banner weapon. 2nd lowest drop rate.'),
   'Y-09 Longbow Synthesis': SNP,
-  '1000 Yard Stare':        SNP,
+  '1000-Yard Stare':        SNP,
 
   // ---- Shotguns -------------------------------------------------------------
 
@@ -256,7 +256,7 @@ export const LCD_PVE = {
   'Party Crasher +1':      SG_ALL,
   'Stolen Will':           n(SG_ALL,     'Guaranteed drop from hoard chest.'),
   'Strongbow-D':           SG_ALL,
-  'Two to the Morgue':     n(SG_ALL,     'Very high damage output.'),
+  'Two To The Morgue':     n(SG_ALL,     'Very high damage output.'),
 
   // ---- Fusion Rifles --------------------------------------------------------
 
@@ -298,7 +298,7 @@ export const LCD_PVE = {
   "Qullim's Terminus":               n(MG_MH, 'Static roll. Kings Fall 390.'),
   'Ruin Wake':                       MG_MH,
   'The Silvered Dread':              MG_MH,
-  'The Swarm':                       MG_MH,
+  'THE SWARM':                       MG_MH,
   'The Unseeing Eye':                n(MG_MH, 'Static roll. Lowest drop rate.'),
   'Unending Deluge III':             MG_MH,
   'Zombie Apocalypse WF47':          MG_MH,

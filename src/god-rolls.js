@@ -147,7 +147,7 @@ export const PVP = {
   "Zero-Day Dilemma":      { source: 'TRUEGaming + Reddit', col1: ["Reflex"], col2: ["Crowd Control"], col3: ["Perfect Balance"], col4: ["Hidden Hand"] },
 
   // Sniper Rifles
-  "1000 Yard Stare":       { source: 'TRUEGaming + Reddit', col1: ["ShortGaze SLH10"], col2: ["Eye of the Storm"], col3: ["Quickdraw"], col4: ["Hidden Hand"] },
+  "1000-Yard Stare":       { source: 'TRUEGaming + Reddit', col1: ["ShortGaze SLH10"], col2: ["Eye of the Storm"], col3: ["Quickdraw"], col4: ["Hidden Hand"] },
   "20/20 AMR7":            { source: 'TRUEGaming + Reddit', col1: ["ShortGaze SLH10"], col2: ["Unflinching"], col3: ["Skip Rounds"], col4: ["Hidden Hand"] },
   "Antinomy XVI":          { source: 'TRUEGaming + Reddit', col1: ["ATA Scout"], col2: ["Unflinching"], col3: ["Performance Bonus"], col4: ["Quickdraw"] },
   "Aoife Rua-D":           { source: 'TRUEGaming + Reddit', col1: ["ATA Scout"], col2: ["Unflinching"], col3: ["Performance Bonus"], col4: ["Quickdraw"] },
