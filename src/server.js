@@ -279,10 +279,10 @@ function hasDefinitionError(rollDef, allPossiblePerks) {
 }
 
 function modeResult(status, isError) {
-  if (isError)                    return '⚠ Error';
-  if (status === 'god_roll')      return '★ GOD ROLL';
-  if (status === 'close')         return '~ Close';
-  if (status === 'not_god_roll')  return '✗ No';
+  if (isError)                    return 'Error';
+  if (status === 'god_roll')      return 'GOD ROLL';
+  if (status === 'close')         return 'Close';
+  if (status === 'not_god_roll')  return 'No';
   return '? —';
 }
 
