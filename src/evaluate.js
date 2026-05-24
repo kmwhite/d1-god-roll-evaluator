@@ -86,16 +86,29 @@ function evaluateAgainstEntry(rollEntry, itemPerks) {
   const unknown = { status: 'unknown', columnsMatched: 0, detail: 'No god roll definition found for this weapon.', source: null };
   if (!rollEntry) return unknown;
 
-  const defs = Array.isArray(rollEntry) ? rollEntry : [rollEntry];
+  const defs    = Array.isArray(rollEntry) ? rollEntry : [rollEntry];
+  const results = defs.map(def => scoreAgainstRoll(def, itemPerks));
+
   let best = null;
-  for (const def of defs) {
-    const result = scoreAgainstRoll(def, itemPerks);
+  for (const result of results) {
     if (!best || STATUS_RANK[result.status] > STATUS_RANK[best.status] ||
         (result.status === best.status && result.columnsMatched > best.columnsMatched)) {
       best = result;
     }
   }
-  return best ?? unknown;
+  if (!best) return unknown;
+
+  // Aggregate all sources that reached the same best score so that, e.g.,
+  // both TRUEGaming and Reddit matching shows "TRUEGaming + Reddit".
+  const sources = [
+    ...new Set(
+      results
+        .filter(r => r.status === best.status && r.columnsMatched === best.columnsMatched)
+        .map(r => r.source)
+        .filter(Boolean),
+    ),
+  ];
+  return { ...best, source: sources.length > 0 ? sources.join(' + ') : null };
 }
 
 /**
@@ -148,9 +161,9 @@ export function buildDimAnnotation(evaluation) {
 function formatLine(label, result) {
   const src = result.source ? ` [${result.source}]` : '';
   switch (result.status) {
-    case 'god_roll':      return `${label}: ✓ GOD ROLL${src}`;
-    case 'close':         return `${label}: ~ Close (${result.columnsMatched}/4)${src} — ${result.detail.split('Missing: ')[1] ?? ''}`;
-    case 'not_god_roll':  return `${label}: ✗ (${result.columnsMatched}/4)`;
+    case 'god_roll':      return `${label}: GOD ROLL${src}`;
+    case 'close':         return `${label}: Close (${result.columnsMatched}/4)${src} — ${result.detail.split('Missing: ')[1] ?? ''}`;
+    case 'not_god_roll':  return `${label}: No (${result.columnsMatched}/4)`;
     case 'unknown':       return `${label}: —`;
   }
 }

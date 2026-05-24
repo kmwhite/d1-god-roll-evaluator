@@ -95,7 +95,7 @@ const membershipType = resolveMembershipType(PLATFORM);
 
 const TIER_NAMES   = { 5: 'Legendary', 6: 'Exotic', 4: 'Rare', 3: 'Uncommon', 2: 'Common' };
 const DAMAGE_NAMES = { 0: 'Kinetic', 1: 'Kinetic', 2: 'Arc', 3: 'Solar', 4: 'Void' };
-const RESULT_RANK  = { '★ GOD ROLL': 0, '~ Close': 1, '✗ No': 2, '⚙ Curated Roll': 3, '⚠ Error': 4, '? —': 5 };
+const RESULT_RANK  = { 'GOD ROLL': 0, 'Close': 1, 'No': 2, 'Curated Roll': 3, 'Error': 4, '-': 5 };
 
 const ARMOR_SLOT_NAMES = {
   3448274439: 'Helmet',
