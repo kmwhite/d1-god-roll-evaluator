@@ -40,7 +40,7 @@ function resultPill(result) {
     : result.includes('Close')       ? 'close'
     : result.includes('Curated')     ? 'curated'
     : result.includes('Error')       ? 'error'
-    : result === '? —'               ? 'unknown'
+    : result === '-'               ? 'unknown'
     : 'no';
   return '<span class="result-pill ' + cls + '">' + RESULT_ICON[cls] + ' ' + RESULT_LABEL[cls] + '</span>';
 }

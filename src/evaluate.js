@@ -118,10 +118,10 @@ function evaluateAgainstEntry(rollEntry, itemPerks) {
  * @param {string[]} itemPerks  All perk names on the weapon instance
  * @returns {WeaponEvaluation}
  */
-export function evaluateWeapon(weaponName, itemPerks) {
+export function evaluateWeapon(weaponName, itemPerks, pvpTable = PVP, pveTable = PVE) {
   return {
-    pvp: evaluateAgainstEntry(PVP[weaponName], itemPerks),
-    pve: evaluateAgainstEntry(PVE[weaponName], itemPerks),
+    pvp: evaluateAgainstEntry(pvpTable[weaponName], itemPerks),
+    pve: evaluateAgainstEntry(pveTable[weaponName], itemPerks),
   };
 }
 

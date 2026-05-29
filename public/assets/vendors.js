@@ -4,7 +4,7 @@ async function loadVendors() {
   const container = document.getElementById('vendors-container');
   container.innerHTML = tabLoadingHtml('Loading vendor inventories…');
   try {
-    const res  = await fetch('/api/vendors');
+    const res  = await fetch('/api/vendors?source=' + encodeURIComponent(sourceFilter));
     const raw  = await res.json();
     if (!raw.ok) throw new Error(raw.error ?? 'Unknown error');
     const data = JSON.parse(JSON.stringify(raw));

@@ -18,6 +18,7 @@ let searchTerm = '';
 // ── Shared filters (apply to both weapons and armor) ─────────────────────────
 let locationFilter = 'all'; // 'all' | 'vault' | characterId string
 let lockFilter     = 'all'; // 'all' | 'locked' | 'unlocked'
+let sourceFilter   = 'any'; // 'any' | 'TRUEGaming' | 'Reddit' | 'Last City Discord'
 
 // ── Armor state ───────────────────────────────────────────────────────────────
 let ARMOR_RAW        = [];

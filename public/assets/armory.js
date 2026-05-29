@@ -23,7 +23,32 @@ async function checkAuth() {
   document.getElementById('header-sub').textContent =
     'DESTINY 1 // ' + (data.platform ?? '').toUpperCase() + ' // ' + (data.displayName ?? '').toUpperCase();
   await loadPlatforms(data.membershipType);
+  await loadSources();
   return true;
+}
+
+async function loadSources() {
+  const sel = document.getElementById('source-select');
+  try {
+    const res  = await fetch('/api/sources');
+    const data = await res.json();
+    if (!data.ok) { sel.style.display = 'none'; return; }
+    sel.innerHTML = '<option value="any">All Sources</option>'
+      + data.sources.map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join('');
+    sel.style.display = 'inline-block';
+    sel.addEventListener('change', async () => {
+      sourceFilter = sel.value;
+      RAW = [];
+      ARMOR_RAW = [];
+      armorLoaded = false;
+      vendorItems_ = [];
+      vendorsLoaded = false;
+      document.getElementById('vendors-container').innerHTML = '';
+      await reloadActiveTab();
+    });
+  } catch {
+    sel.style.display = 'none';
+  }
 }
 
 async function loadPlatforms(currentMembershipType) {
@@ -53,7 +78,7 @@ async function loadPlatforms(currentMembershipType) {
       vendorItems_ = [];
       vendorsLoaded = false;
       document.getElementById('vendors-container').innerHTML = '';
-      await loadInventory();
+      await reloadActiveTab();
     });
   } catch {
     sel.style.display = 'none';
@@ -80,6 +105,12 @@ function stopLoadingAnimation() {
   clearInterval(loadingInterval);
 }
 
+function reloadActiveTab() {
+  if (activeTab === 'armor')   return loadArmor();
+  if (activeTab === 'vendors') return loadVendors();
+  return loadInventory();
+}
+
 async function loadInventory() {
   // Show the app shell (tab bar + filters) immediately so the UI is never a blank page
   show('app');
@@ -92,7 +123,7 @@ async function loadInventory() {
   document.getElementById('weapon-cards').innerHTML = loadingHtml;
   updateLayout();
   try {
-    const res = await fetch('/api/inventory');
+    const res = await fetch('/api/inventory?source=' + encodeURIComponent(sourceFilter));
     const raw = await res.json();
     if (!raw.ok) throw new Error(raw.error ?? 'Unknown error');
     const data = JSON.parse(JSON.stringify(raw));
@@ -163,9 +194,9 @@ function getRows() {
   // Result filter — checked against whichever mode(s) are active
   if (filterMode === 'god-roll') rows = rows.filter(r => activeEvals(r).some(e => e.result.includes('GOD')));
   else if (filterMode === 'close')   rows = rows.filter(r => activeEvals(r).some(e => e.result.includes('Close')));
-  else if (filterMode === 'no')      rows = rows.filter(r => activeEvals(r).some(e => e.result === '✗ No'));
+  else if (filterMode === 'no')      rows = rows.filter(r => activeEvals(r).some(e => e.result === 'No'));
   else if (filterMode === 'curated') rows = rows.filter(r => activeEvals(r).some(e => e.result.includes('Curated')));
-  else if (filterMode === 'unknown') rows = rows.filter(r => activeEvals(r).some(e => e.result === '? —'));
+  else if (filterMode === 'unknown') rows = rows.filter(r => activeEvals(r).some(e => e.result === '-'));
   else if (filterMode === 'error')   rows = rows.filter(r => activeEvals(r).some(e => e.result.includes('Error')));
 
   if (slotFilter   !== 'all') rows = rows.filter(r => r.slot   === slotFilter);

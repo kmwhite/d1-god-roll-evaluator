@@ -57,7 +57,19 @@ import {
 } from './bungie.js';
 
 import { evaluateWeapon } from './evaluate.js';
-import { PVP, PVE }                           from './god-rolls.js';
+import { PVP, PVE } from './god-rolls.js';
+import { TG_PVP } from './god-rolls/truegaming-pvp.js';
+import { TG_PVE } from './god-rolls/truegaming-pve.js';
+import { RD_PVP } from './god-rolls/reddit-pvp.js';
+import { RD_PVE } from './god-rolls/reddit-pve.js';
+import { LCD_PVE } from './god-rolls/last-city-discord-pve.js';
+
+const SOURCE_TABLES = {
+  'any':               { pvp: PVP,    pve: PVE    },
+  'TRUEGaming':        { pvp: TG_PVP, pve: TG_PVE },
+  'Reddit':            { pvp: RD_PVP, pve: RD_PVE },
+  'Last City Discord': { pvp: {},     pve: LCD_PVE },
+};
 
 // ---------------------------------------------------------------------------
 // Config
@@ -387,7 +399,7 @@ function buildModalData(stub, itemData, talentGridMap) {
  * Run the full evaluation pipeline for the given Bungie token.
  * Returns the htmlRows array ready for the browser to render.
  */
-async function runEvaluation(bungieToken, bungieNetMembershipId, membershipTypeOverride) {
+async function runEvaluation(bungieToken, bungieNetMembershipId, membershipTypeOverride, pvpTable = PVP, pveTable = PVE) {
   const mt = membershipTypeOverride ?? membershipType;
   const { weaponHashes, itemDataMap, talentGridMap } = await buildManifestData(API_KEY);
   const platformMembershipId = await getMembershipId(mt, API_KEY, bungieToken, bungieNetMembershipId);
@@ -412,7 +424,7 @@ async function runEvaluation(bungieToken, bungieNetMembershipId, membershipTypeO
     const perks        = extractPerkNames(stub, null, talentGridMap);
     const { byColumn, all } = perks;
     const allPossible  = buildAllPossiblePerks(stub, talentGridMap);
-    const evaluation   = evaluateWeapon(name, all);
+    const evaluation   = evaluateWeapon(name, all, pvpTable, pveTable);
     const tierType     = itemData?.tierType ?? 0;
     const icon         = itemData?.icon ?? null;
     const isCurated    = itemData?.isCurated ?? false;
@@ -467,8 +479,8 @@ async function runEvaluation(bungieToken, bungieNetMembershipId, membershipTypeO
       damageRaw:      r.damageType,
       light:          r.light ?? null,
       evaluation: {
-        pvp: buildModeEval(PVP[r.name], r.evaluation.pvp, r.byColumn, r.all, r.allPossible, r.isCurated),
-        pve: buildModeEval(PVE[r.name], r.evaluation.pve, r.byColumn, r.all, r.allPossible, r.isCurated),
+        pvp: buildModeEval(pvpTable[r.name], r.evaluation.pvp, r.byColumn, r.all, r.allPossible, r.isCurated),
+        pve: buildModeEval(pveTable[r.name], r.evaluation.pve, r.byColumn, r.all, r.allPossible, r.isCurated),
       },
       stats,
       perks,
@@ -538,7 +550,7 @@ const WEAPON_BUCKET_HASHES_ARRAY = [1498876634, 2465295065, 953998645];
 const WEAPON_BUCKET_SET = new Set(WEAPON_BUCKET_HASHES_ARRAY);
 const SLOT_NAMES_V = { 1498876634: 'Primary', 2465295065: 'Special', 953998645: 'Heavy' };
 
-async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap, itemDataMap, armorDataMap, armorStatHashes, membershipTypeOverride) {
+async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap, itemDataMap, armorDataMap, armorStatHashes, membershipTypeOverride, pvpTable = PVP, pveTable = PVE) {
   const mt = membershipTypeOverride ?? membershipType;
   const platformMembershipId = await getMembershipId(mt, API_KEY, bungieToken, bungieNetMembershipId);
 
@@ -611,7 +623,7 @@ async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap
         const slot         = SLOT_NAMES_V[itemData.bucketTypeHash] ?? 'Unknown';
         const perkData     = extractPerkNames(patchedStub, null, talentGridMap);
         const allPossible  = buildAllPossiblePerks(patchedStub, talentGridMap);
-        const evaluation   = evaluateWeapon(name, perkData.all);
+        const evaluation   = evaluateWeapon(name, perkData.all, pvpTable, pveTable);
         const modalData    = buildModalData(patchedStub, itemData, talentGridMap);
 
         rows.push({
@@ -627,8 +639,8 @@ async function buildVendorRows(bungieToken, bungieNetMembershipId, talentGridMap
           damageRaw: damageType,
           light:    null,
           evaluation: {
-            pvp: buildModeEval(PVP[name], evaluation.pvp, perkData.byColumn, perkData.all, allPossible, isCurated),
-            pve: buildModeEval(PVE[name], evaluation.pve, perkData.byColumn, perkData.all, allPossible, isCurated),
+            pvp: buildModeEval(pvpTable[name], evaluation.pvp, perkData.byColumn, perkData.all, allPossible, isCurated),
+            pve: buildModeEval(pveTable[name], evaluation.pve, perkData.byColumn, perkData.all, allPossible, isCurated),
           },
           stats: modalData.stats,
           perks: modalData.perks,
@@ -858,10 +870,16 @@ app.post('/auth/logout', (req, res) => {
 // Inventory / evaluation API
 // ---------------------------------------------------------------------------
 
+app.get('/api/sources', requireAuth, (req, res) => {
+  res.json({ ok: true, sources: Object.keys(SOURCE_TABLES).filter(s => s !== 'any') });
+});
+
 app.get('/api/inventory', requireAuth, async (req, res) => {
   try {
+    const src = req.query.source ?? 'any';
+    const tables = SOURCE_TABLES[src] ?? SOURCE_TABLES['any'];
     const { items, characters, characterIds, platformMembershipId } = await runEvaluation(
-      req.token.access_token, req.token.membership_id, req.membershipType
+      req.token.access_token, req.token.membership_id, req.membershipType, tables.pvp, tables.pve
     );
     res.json({ ok: true, items, characters, characterIds, platformMembershipId });
   } catch (err) {
@@ -872,10 +890,12 @@ app.get('/api/inventory', requireAuth, async (req, res) => {
 
 app.get('/api/vendors', requireAuth, async (req, res) => {
   try {
+    const src = req.query.source ?? 'any';
+    const tables = SOURCE_TABLES[src] ?? SOURCE_TABLES['any'];
     const { itemDataMap, talentGridMap, armorDataMap, armorStatHashes } = await buildManifestData(API_KEY);
     const sections = await buildVendorRows(
       req.token.access_token, req.token.membership_id,
-      talentGridMap, itemDataMap, armorDataMap, armorStatHashes, req.membershipType
+      talentGridMap, itemDataMap, armorDataMap, armorStatHashes, req.membershipType, tables.pvp, tables.pve
     );
     res.json({ ok: true, sections });
   } catch (err) {
